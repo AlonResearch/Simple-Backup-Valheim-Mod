@@ -1,9 +1,17 @@
 $ErrorActionPreference = 'Stop'
 
+Write-Host "Cleaning up old assemblies..." -ForegroundColor Cyan
+if (Test-Path "src\bin\Release\net462\SimpleBackup.dll") { Remove-Item -Force "src\bin\Release\net462\SimpleBackup.dll" }
+if (Test-Path "src\bin\Debug\net462\SimpleBackup.dll") { Remove-Item -Force "src\bin\Debug\net462\SimpleBackup.dll" }
+
 Write-Host "Building SimpleBackup..." -ForegroundColor Cyan
 dotnet build -c Release
 if ($LASTEXITCODE -ne 0) {
     dotnet build
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "Fatally failed to compile DLL!" -ForegroundColor Red
+        exit 1
+    }
 }
 
 Write-Host "Preparing Release Folder..." -ForegroundColor Cyan

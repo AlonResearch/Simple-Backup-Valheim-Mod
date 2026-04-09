@@ -8,45 +8,57 @@ namespace SimpleBackup
 {
     public static class RestoreCommandLogic
     {
+        private static System.Reflection.FieldInfo _terminalCommandsField;
+
+        public static bool IsBackupCommandMissing()
+        {
+            return !CommandExists("sb.backup");
+        }
+
+        private static bool CommandExists(string cmd)
+        {
+            try
+            {
+                if (_terminalCommandsField == null)
+                    _terminalCommandsField = typeof(Terminal).GetField("commands", System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic);
+
+                if (_terminalCommandsField != null)
+                {
+                    var dict = _terminalCommandsField.GetValue(null) as System.Collections.IDictionary;
+                    return dict != null && dict.Contains(cmd);
+                }
+            }
+            catch { }
+            return true; // Return true for 'missing' if we can't read it
+        }
+
         public static void RegisterCommands()
         {
-            if (Terminal.commands == null) return;
-
             bool injected = false;
-            if (!Terminal.commands.ContainsKey("sb.restore"))
+            
+            if (!CommandExists("sb.restore"))
             {
                 new Terminal.ConsoleCommand("sb.restore", "Restores a backup.", (args) => HandleRestoreCommand(args.Context, args.Args),
-                    isCheat: false, isNetwork: false, onlyServer: false, isSecret: false, allowInMainmenu: true);
+                    isCheat: false, isNetwork: false, onlyServer: false, isSecret: false);
                 injected = true;
             }
 
-            if (!Terminal.commands.ContainsKey("sb.backup"))
+            if (!CommandExists("sb.backup"))
             {
                 new Terminal.ConsoleCommand("sb.backup", "Triggers a backup.", (args) => HandleBackupCommand(args.Context, args.Args),
-                    isCheat: false, isNetwork: false, onlyServer: false, isSecret: false, allowInMainmenu: true);
+                    isCheat: false, isNetwork: false, onlyServer: false, isSecret: false);
                 injected = true;
             }
 
-            if (!Terminal.commands.ContainsKey("sb.list"))
+            if (!CommandExists("sb.list"))
             {
                 new Terminal.ConsoleCommand("sb.list", "Lists backups.", (args) => HandleListCommand(args.Context),
-                    isCheat: false, isNetwork: false, onlyServer: false, isSecret: false, allowInMainmenu: true);
+                    isCheat: false, isNetwork: false, onlyServer: false, isSecret: false);
                 injected = true;
             }
 
             if (injected)
             {
-                try
-                {
-                    if (Terminal.m_terminalInstances != null)
-                    {
-                        foreach (var term in Terminal.m_terminalInstances)
-                        {
-                            if (term != null) term.updateCommandList();
-                        }
-                    }
-                }
-                catch { }
                 SimpleBackupPlugin.Log.LogInfo("sb. Commands forcefully registered into Terminal dictionary.");
             }
         }

@@ -37,12 +37,19 @@ namespace SimpleBackup
             Logger.LogInfo($"{PluginName} v{PluginVersion} loaded!");
         }
 
+        private float _commandCheckTimer = 0f;
+
         private void Update()
         {
-            // Failsafe: Continuously verify our console commands are registered to bypass Jotunn wiping them
-            if (Terminal.commands != null && !Terminal.commands.ContainsKey("sb.backup"))
+            _commandCheckTimer += Time.deltaTime;
+            if (_commandCheckTimer > 2.0f)
             {
-                RestoreCommandLogic.RegisterCommands();
+                _commandCheckTimer = 0f;
+                // Failsafe: Continuously verify our console commands are registered
+                if (RestoreCommandLogic.IsBackupCommandMissing())
+                {
+                    RestoreCommandLogic.RegisterCommands();
+                }
             }
 
             if (BackupIntervalMinutes.Value > 0)
