@@ -17,7 +17,6 @@ namespace SimpleBackup
             Transform menuEntries = __instance.m_menuDialog.transform.Find("MenuEntries");
             if (menuEntries == null)
             {
-                 // Fallback for different UI versions
                  menuEntries = __instance.m_menuDialog.transform.Find("menu") ?? 
                                __instance.m_menuDialog.transform.Find("MENU") ?? 
                                __instance.m_menuDialog.transform.Find("MenuContainer");
@@ -25,37 +24,40 @@ namespace SimpleBackup
 
             if (menuEntries != null)
             {
-                // Clone the 'Settings' button as it's the most stable anchor
-                Transform settingsButton = menuEntries.Find("Settings") ?? 
-                                            menuEntries.Find("ButtonSettings") ??
-                                            menuEntries.Find("SettingsBtn");
+                // We clone Settings but anchor to Save for better positioning
+                Transform settingsTemplate = menuEntries.Find("Settings") ?? menuEntries.Find("ButtonSettings");
+                Transform saveAnchor = menuEntries.Find("Save") ?? menuEntries.Find("ButtonSave");
 
-                if (settingsButton != null)
+                if (settingsTemplate != null)
                 {
-                    SimpleBackupPlugin.Log.LogInfo("Found Settings button in Esc Menu, injecting Backup button.");
+                    SimpleBackupPlugin.Log.LogInfo("Injecting Backup button under Save.");
 
-                    GameObject backupButtonObj = GameObject.Instantiate(settingsButton.gameObject, menuEntries);
+                    GameObject backupButtonObj = GameObject.Instantiate(settingsTemplate.gameObject, menuEntries);
                     backupButtonObj.name = "BackupGame";
                     
-                    int settingsBtnIndex = settingsButton.GetSiblingIndex();
-                    backupButtonObj.transform.SetSiblingIndex(settingsBtnIndex + 1);
-
-                    // Modern Valheim uses TextMeshPro (TMP_Text)
-                    TMP_Text btnText = backupButtonObj.GetComponentInChildren<TMP_Text>();
-                    if (btnText != null)
+                    // Position after Save if possible
+                    if (saveAnchor != null)
                     {
-                        btnText.text = "Backup";
+                        backupButtonObj.transform.SetSiblingIndex(saveAnchor.GetSiblingIndex() + 1);
                     }
                     else
                     {
-                        // Fallback for older UI
-                        Text legacyText = backupButtonObj.GetComponentInChildren<Text>();
-                        if (legacyText != null) legacyText.text = "Backup";
+                        backupButtonObj.transform.SetSiblingIndex(settingsTemplate.GetSiblingIndex() + 1);
                     }
+
+                    TMP_Text btnText = backupButtonObj.GetComponentInChildren<TMP_Text>();
+                    if (btnText != null) btnText.text = "Backup";
 
                     Button btn = backupButtonObj.GetComponent<Button>();
                     if (btn != null)
                     {
+                        // 1. Silent the native 'Settings' persistent trigger from the clone
+                        for (int i = 0; i < btn.onClick.GetPersistentEventCount(); i++)
+                        {
+                            btn.onClick.SetPersistentListenerState(i, UnityEngine.Events.UnityEventCallState.Off);
+                        }
+
+                        // 2. Add our clean backup functionality
                         btn.onClick.RemoveAllListeners();
                         btn.onClick.AddListener(() =>
                         {
@@ -71,18 +73,9 @@ namespace SimpleBackup
                             }
                         });
 
-                        // Ensure controller/keyboard navigation works by cloning the settings button's navigation
-                        btn.navigation = settingsButton.GetComponent<Button>().navigation;
+                        btn.navigation = settingsTemplate.GetComponent<Button>().navigation;
                     }
                 }
-                else
-                {
-                    SimpleBackupPlugin.Log.LogWarning("Could not find the Settings button in the Esc Menu container.");
-                }
-            }
-            else
-            {
-                SimpleBackupPlugin.Log.LogWarning("Could not find the MenuEntries container in the Esc Menu.");
             }
         }
     }
