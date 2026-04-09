@@ -12,7 +12,7 @@ namespace SimpleBackup
     {
         public const string PluginGUID = "com.aloncifer.simplebackup";
         public const string PluginName = "SimpleBackup";
-        public const string PluginVersion = "0.0.1";
+        public const string PluginVersion = "0.0.2";
 
         private Harmony _harmony;
         public static SimpleBackupPlugin Instance;
@@ -39,6 +39,12 @@ namespace SimpleBackup
 
         private void Update()
         {
+            // Failsafe: Continuously verify our console commands are registered to bypass Jotunn wiping them
+            if (Terminal.commands != null && !Terminal.commands.ContainsKey("sb.backup"))
+            {
+                RestoreCommandLogic.RegisterCommands();
+            }
+
             if (BackupIntervalMinutes.Value > 0)
             {
                 // Only run the timer if we are actively loaded into a world

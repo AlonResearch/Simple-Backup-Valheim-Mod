@@ -6,71 +6,49 @@ using HarmonyLib;
 
 namespace SimpleBackup
 {
-    [HarmonyPatch(typeof(Terminal))]
-    public static class RestoreCommandPatch
+    public static class RestoreCommandLogic
     {
-        [HarmonyPatch("InitTerminal")]
-        [HarmonyPostfix]
-        public static void InitTerminal_Postfix(Terminal __instance)
+        public static void RegisterCommands()
         {
-            if (__instance == null) return;
+            if (Terminal.commands == null) return;
 
-            RegisterCommands(__instance);
-            SimpleBackupPlugin.Log.LogInfo("sb. Commands Registered in Postfix.");
-        }
-
-        [HarmonyPatch("TryRunCommand")]
-        [HarmonyPrefix]
-        public static bool TryRunCommand_Prefix(Terminal __instance, string text)
-        {
-            if (string.IsNullOrEmpty(text)) return true;
-
-            string cmd = text.Trim();
-            string cmdLower = cmd.ToLower();
-
-            if (cmdLower.StartsWith("sb."))
-            {
-                string[] parts = cmd.Split(' ');
-                string commandName = parts[0].ToLower();
-
-                if (commandName == "sb.backup")
-                {
-                    HandleBackupCommand(__instance, parts);
-                    return false; // Handled
-                }
-                else if (commandName == "sb.list")
-                {
-                    HandleListCommand(__instance);
-                    return false; // Handled
-                }
-                else if (commandName == "sb.restore")
-                {
-                    HandleRestoreCommand(__instance, parts);
-                    return false; // Handled
-                }
-            }
-
-            return true; // Not our command, let the game handle normally
-        }
-
-        private static void RegisterCommands(Terminal terminal)
-        {
+            bool injected = false;
             if (!Terminal.commands.ContainsKey("sb.restore"))
             {
-                new Terminal.ConsoleCommand("sb.restore", "Restores a backup.", (args) => HandleRestoreCommand(args.Context, args.Args));
+                new Terminal.ConsoleCommand("sb.restore", "Restores a backup.", (args) => HandleRestoreCommand(args.Context, args.Args),
+                    isCheat: false, isNetwork: false, onlyServer: false, isSecret: false, allowInMainmenu: true);
+                injected = true;
             }
 
             if (!Terminal.commands.ContainsKey("sb.backup"))
             {
-                new Terminal.ConsoleCommand("sb.backup", "Triggers a backup.", (args) => HandleBackupCommand(args.Context, args.Args));
+                new Terminal.ConsoleCommand("sb.backup", "Triggers a backup.", (args) => HandleBackupCommand(args.Context, args.Args),
+                    isCheat: false, isNetwork: false, onlyServer: false, isSecret: false, allowInMainmenu: true);
+                injected = true;
             }
 
             if (!Terminal.commands.ContainsKey("sb.list"))
             {
-                new Terminal.ConsoleCommand("sb.list", "Lists backups.", (args) => HandleListCommand(args.Context));
+                new Terminal.ConsoleCommand("sb.list", "Lists backups.", (args) => HandleListCommand(args.Context),
+                    isCheat: false, isNetwork: false, onlyServer: false, isSecret: false, allowInMainmenu: true);
+                injected = true;
             }
 
-            terminal.updateCommandList();
+            if (injected)
+            {
+                try
+                {
+                    if (Terminal.m_terminalInstances != null)
+                    {
+                        foreach (var term in Terminal.m_terminalInstances)
+                        {
+                            if (term != null) term.updateCommandList();
+                        }
+                    }
+                }
+                catch { }
+                SimpleBackupPlugin.Log.LogInfo("sb. Commands forcefully registered into Terminal dictionary.");
+            }
         }
 
         private static void HandleBackupCommand(Terminal context, string[] args)
