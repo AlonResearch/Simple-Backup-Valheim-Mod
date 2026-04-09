@@ -18,11 +18,11 @@ Before uploading the mod to NexusMods or Thunderstore for thousands of users to 
 
 ## Phase 3: Console Commands Validation
 1. While still loaded in the test world, hit `F5` to open the terminal.
-2. Type `backup char` and hit Enter.
+2. Type `sb.backup char` and hit Enter.
    - Validate: The console says "Starting background backup for character: [YourName]..."
-3. Type `backup world` and hit Enter.
+3. Type `sb.backup world` and hit Enter.
    - Validate: The console says "Starting background backup for world: [WorldName]..."
-4. Type `backup_list` and hit Enter.
+4. Type `sb.list` and hit Enter.
    - Validate: The console prints a clean list containing the zip files that were just generated.
 
 ## Phase 4: Output Verification
@@ -39,7 +39,7 @@ Before uploading the mod to NexusMods or Thunderstore for thousands of users to 
 1. Build a campfire, drop an item on the floor, and hit the **Backup** button. Wait 5 seconds.
 2. Destroy the campfire, pick up the item. 
 3. Disconnect from the server and go to the **Main Menu**.
-4. Press `F5` and type `backup_restore [NameOfTestWorld]`.
+4. Press `F5` and type `sb.restore [NameOfTestWorld]`.
    - Validate: The console should say "Restore complete!".
 5. Log back into the test world.
    - Validate: Is your campfire back exactly where it was before you destroyed it? Is the item back on the floor?

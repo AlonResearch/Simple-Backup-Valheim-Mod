@@ -28,11 +28,11 @@ ________________________________________________
 ### ⚙️ Commands (F5 Console):
 Because forcefully overwriting heavily compressed `.fwl` and `.db` files while Valheim's engine is actively rendering them will instantly crash the game, SimpleBackup intelligently forces restoration queries from the absolute safety of the Main Menu F5 Console!
 
-> **`backup_list`** - shows a clean horizontal list of all currently available zip backups your system has secured. 
+> **`sb.list`** - shows a clean horizontal list of all currently available zip backups your system has secured. 
 
-> **`backup <char|world>`** - in-game command to manually trigger a zip compression specifically for your current character (`backup char`) or world (`backup world`).
+> **`sb.backup [char|world]`** - in-game command to manually trigger a zip compression specifically for your current character (`sb.backup char`) or world (`sb.backup world`). No arguments backs up both.
 
-> **`backup_restore <name>`** - securely renames your active target files to `.old` to prevent data-loss, and magically unpacks the ZIP exactly back into the Valheim root directories! *(Example: `backup_restore MyWorld`)*
+> **`sb.restore <name>`** - securely renames your active target files to `.old` to prevent data-loss, and magically unpacks the ZIP exactly back into the Valheim root directories! *(Example: `sb.restore MyWorld`)*
 
 ________________________________________________
 
@@ -60,7 +60,6 @@ ________________________________________________
 
 ### 📥 Installation 
 
-1. Ensure you have the core framework **BepInExPack Valheim** installed.
 1. Ensure you have the core framework **BepInExPack Valheim** installed.
 2. Download the `Aloncifer-SimpleBackup-0.0.1.zip` file.
 3. Open **r2modman** (or Thunderstore Mod Manager) and your Valheim profile.

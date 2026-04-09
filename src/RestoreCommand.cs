@@ -16,13 +16,13 @@ namespace SimpleBackup
             if (__instance == null) return;
 
             new Terminal.ConsoleCommand(
-                "backup_restore",
-                "Restores the latest backup for a given save file base name (e.g., 'backup_restore MyWorld')",
+                "sb.restore",
+                "Restores the latest backup for a given save file base name (e.g., 'sb.restore MyWorld')",
                 (Terminal.ConsoleEventArgs args) =>
                 {
                     if (args.Length < 2)
                     {
-                        args.Context.AddString("Usage: backup_restore <SaveName>");
+                        args.Context.AddString("Usage: sb.restore <SaveName>");
                         return;
                     }
 
@@ -36,47 +36,46 @@ namespace SimpleBackup
             );
 
             new Terminal.ConsoleCommand(
-                "backup",
-                "Manually triggers a backup. Usage: backup <char|world>",
+                "sb.backup",
+                "Triggers a backup. Usage: sb.backup [char|world]. No arguments backs up both (if applicable).",
                 (Terminal.ConsoleEventArgs args) =>
                 {
-                    if (args.Length < 2)
-                    {
-                        args.Context.AddString("Usage: backup <char|world>");
-                        return;
-                    }
-
-                    string option = args[1].ToLower();
-                    if (option == "char")
+                    string option = args.Length >= 2 ? args[1].ToLower() : "both";
+                    
+                    if (option == "char" || option == "both")
                     {
                         string cName = Player.m_localPlayer != null ? Player.m_localPlayer.GetPlayerName() : null;
-                        if (string.IsNullOrEmpty(cName))
+                        if (!string.IsNullOrEmpty(cName))
+                        {
+                            args.Context.AddString($"Starting background backup for character: {cName}...");
+                            System.Threading.Tasks.Task.Run(() => BackupManager.PerformFullBackup(null, cName));
+                        }
+                        else if (option == "char")
                         {
                             args.Context.AddString("ERROR: No active character found. Please load into the game first.");
-                            return;
                         }
-                        args.Context.AddString($"Starting background backup for character: {cName}...");
-                        System.Threading.Tasks.Task.Run(() => BackupManager.PerformFullBackup(null, cName));
                     }
-                    else if (option == "world")
+
+                    if (option == "world" || option == "both")
                     {
-                        if (ZNet.instance == null || !ZNet.instance.IsServer())
+                        if (ZNet.instance != null && ZNet.instance.IsServer())
+                        {
+                            string wName = ZNet.instance.GetWorldName();
+                            if (!string.IsNullOrEmpty(wName))
+                            {
+                                args.Context.AddString($"Starting background backup for world: {wName}...");
+                                System.Threading.Tasks.Task.Run(() => BackupManager.PerformFullBackup(wName, null));
+                            }
+                        }
+                        else if (option == "world")
                         {
                             args.Context.AddString("ERROR: You can only backup a world if you are actively hosting it locally.");
-                            return;
                         }
-                        string wName = ZNet.instance.GetWorldName();
-                        if (string.IsNullOrEmpty(wName))
-                        {
-                            args.Context.AddString("ERROR: No active world found to backup.");
-                            return;
-                        }
-                        args.Context.AddString($"Starting background backup for world: {wName}...");
-                        System.Threading.Tasks.Task.Run(() => BackupManager.PerformFullBackup(wName, null));
                     }
-                    else
+                    
+                    if (option != "char" && option != "world" && option != "both")
                     {
-                        args.Context.AddString("Unknown option. Usage: backup <char|world>");
+                        args.Context.AddString("Unknown option. Usage: sb.backup [char|world]");
                     }
                 },
                 isCheat: false,
@@ -86,7 +85,7 @@ namespace SimpleBackup
             );
 
             new Terminal.ConsoleCommand(
-                "backup_list",
+                "sb.list",
                 "Lists available backups.",
                 (Terminal.ConsoleEventArgs args) =>
                 {

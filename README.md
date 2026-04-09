@@ -67,7 +67,7 @@ Generated inside `Valheim/BepInEx/config/` automatically on the first boot:
 ## Quick Restore Guide
 1. Reboot to the Valheim Main Menu.
 2. Press **F5** to open the developer console.
-3. Type `backup_list` to see your tracked history.
-4. Type `backup_restore <YourCharOrWorld>` to quickly unpack your archive.
-5. In-game, you can also use `backup <char|world>` to quickly secure a specific state!
+3. Type `sb.list` to see your tracked history.
+4. Type `sb.restore <YourCharOrWorld>` to quickly unpack your archive.
+5. In-game, you can also use `sb.backup [char|world]` to quickly secure a specific state!
 5. Launch the game normally! If you wish to revert to your corrupted save, navigate to your save directory and delete the restored files, and erase the `.old` extension from your backups.
