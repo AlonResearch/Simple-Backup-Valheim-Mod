@@ -23,6 +23,8 @@ namespace SimpleBackup
             SimpleBackupPlugin.Log.LogInfo("Starting Backup procedure...");
 
             List<string> sourceDirectories = GetValheimSaveDirectories();
+            int successCount = 0;
+            
             foreach (string dir in sourceDirectories)
             {
                 if (!Directory.Exists(dir)) continue;
@@ -30,12 +32,27 @@ namespace SimpleBackup
                 string folderName = new DirectoryInfo(dir).Name; // "worlds", "characters", "worlds_local", etc.
                 bool isCharacter = folderName.Contains("character");
 
-                BackupDirectory(dir, isCharacter, targetWorld, targetCharacter);
+                int backedUp = BackupDirectory(dir, isCharacter, targetWorld, targetCharacter);
+                successCount += backedUp;
+            }
+            
+            if (successCount > 0)
+            {
+                string msg = $"Backup complete! Successfully archived {successCount} save(s). It is now safe to close the game.";
+                SimpleBackupPlugin.QueueUIMessage(msg);
+                SimpleBackupPlugin.Log.LogInfo(msg);
+            }
+            else
+            {
+                string msg = "Backup process finished, but no matching saves were found to backup.";
+                SimpleBackupPlugin.QueueUIMessage(msg);
+                SimpleBackupPlugin.Log.LogWarning(msg);
             }
         }
 
-        private static void BackupDirectory(string directoryPath, bool isCharacter, string targetWorld, string targetCharacter)
+        private static int BackupDirectory(string directoryPath, bool isCharacter, string targetWorld, string targetCharacter)
         {
+            int createdZips = 0;
             string backupRoot = GetBackupRootDirectory();
             string categoryName = directoryPath.Contains("remote") ? "SteamCloud_" + new DirectoryInfo(directoryPath).Name : "Local_" + new DirectoryInfo(directoryPath).Name;
             string targetBackupFolder = Path.Combine(backupRoot, categoryName);
@@ -70,6 +87,7 @@ namespace SimpleBackup
                         }
                     }
                     SimpleBackupPlugin.Log.LogInfo($"Backed up {baseName} to {zipFileName}");
+                    createdZips++;
                 }
                 catch (Exception ex)
                 {
@@ -78,6 +96,8 @@ namespace SimpleBackup
 
                 EnforceRetentionPolicy(targetBackupFolder, baseName);
             }
+            
+            return createdZips;
         }
 
         private static void EnforceRetentionPolicy(string backupDirectory, string baseName)

@@ -4,6 +4,7 @@ using BepInEx.Logging;
 using HarmonyLib;
 using UnityEngine;
 using System.Reflection;
+using System.Collections.Concurrent;
 
 namespace SimpleBackup
 {
@@ -16,6 +17,12 @@ namespace SimpleBackup
 
         private Harmony _harmony;
         public static SimpleBackupPlugin Instance;
+        private static readonly ConcurrentQueue<string> _uiMessageQueue = new ConcurrentQueue<string>();
+
+        public static void QueueUIMessage(string msg)
+        {
+            _uiMessageQueue.Enqueue(msg);
+        }
         public static ManualLogSource Log;
 
         public static ConfigEntry<int> BackupIntervalMinutes;
@@ -49,6 +56,20 @@ namespace SimpleBackup
                 if (RestoreCommandLogic.IsBackupCommandMissing())
                 {
                     RestoreCommandLogic.RegisterCommands();
+                }
+            }
+
+            while (_uiMessageQueue.TryDequeue(out string message))
+            {
+                if (MessageHud.instance != null)
+                {
+                    MessageHud.instance.ShowMessage(MessageHud.MessageType.TopLeft, message);
+                }
+                
+                // If console is open, also safely print it there
+                if (Console.instance != null)
+                {
+                    Console.instance.Print(message);
                 }
             }
 
