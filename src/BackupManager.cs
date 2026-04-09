@@ -18,12 +18,20 @@ namespace SimpleBackup
             return path;
         }
 
+        public struct BackupMetrics
+        {
+            public int Count;
+            public long Bytes;
+        }
+
         public static void PerformFullBackup(string targetWorld = null, string targetCharacter = null)
         {
             SimpleBackupPlugin.Log.LogInfo("Starting Backup procedure...");
+            var stopwatch = System.Diagnostics.Stopwatch.StartNew();
 
             List<string> sourceDirectories = GetValheimSaveDirectories();
             int successCount = 0;
+            long totalBytes = 0;
             
             foreach (string dir in sourceDirectories)
             {
@@ -32,13 +40,18 @@ namespace SimpleBackup
                 string folderName = new DirectoryInfo(dir).Name; // "worlds", "characters", "worlds_local", etc.
                 bool isCharacter = folderName.Contains("character");
 
-                int backedUp = BackupDirectory(dir, isCharacter, targetWorld, targetCharacter);
-                successCount += backedUp;
+                var metrics = BackupDirectory(dir, isCharacter, targetWorld, targetCharacter);
+                successCount += metrics.Count;
+                totalBytes += metrics.Bytes;
             }
             
+            stopwatch.Stop();
+            double seconds = stopwatch.Elapsed.TotalSeconds;
+            double megabytes = totalBytes / 1048576.0;
+
             if (successCount > 0)
             {
-                string msg = $"Backup complete! Successfully archived {successCount} save(s). It is now safe to close the game.";
+                string msg = $"Backup complete! {successCount} saves ({megabytes:F2} MB) safely archived in {seconds:F1}s.";
                 SimpleBackupPlugin.QueueUIMessage(msg);
                 SimpleBackupPlugin.Log.LogInfo(msg);
             }
@@ -50,9 +63,9 @@ namespace SimpleBackup
             }
         }
 
-        private static int BackupDirectory(string directoryPath, bool isCharacter, string targetWorld, string targetCharacter)
+        private static BackupMetrics BackupDirectory(string directoryPath, bool isCharacter, string targetWorld, string targetCharacter)
         {
-            int createdZips = 0;
+            BackupMetrics metrics = new BackupMetrics();
             string backupRoot = GetBackupRootDirectory();
             string categoryName = directoryPath.Contains("remote") ? "SteamCloud_" + new DirectoryInfo(directoryPath).Name : "Local_" + new DirectoryInfo(directoryPath).Name;
             string targetBackupFolder = Path.Combine(backupRoot, categoryName);
@@ -86,8 +99,10 @@ namespace SimpleBackup
                             archive.CreateEntryFromFile(file, Path.GetFileName(file));
                         }
                     }
+                    var fileInfo = new FileInfo(zipFilePath);
+                    metrics.Bytes += fileInfo.Length;
+                    metrics.Count++;
                     SimpleBackupPlugin.Log.LogInfo($"Backed up {baseName} to {zipFileName}");
-                    createdZips++;
                 }
                 catch (Exception ex)
                 {
@@ -97,7 +112,7 @@ namespace SimpleBackup
                 EnforceRetentionPolicy(targetBackupFolder, baseName);
             }
             
-            return createdZips;
+            return metrics;
         }
 
         private static void EnforceRetentionPolicy(string backupDirectory, string baseName)
