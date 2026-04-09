@@ -2,11 +2,12 @@
 
 Before uploading the mod to NexusMods or Thunderstore for thousands of users to download, it is highly recommended to run through this QA checklist to validate that no edge-cases crash the game!
 
-## Phase 1: Installation & Setup
-1. Open your project folder and run `.\build_release.ps1` to ensure you build the absolute latest version.
-2. Navigate to your Valheim game directory (usually `C:\Program Files (x86)\Steam\steamapps\common\Valheim\BepInEx\plugins\`).
-3. If BepInEx is installed, drag and drop the `SimpleBackup.dll` (located in `src\bin\Release\net462\`) directly into the `plugins` folder.
-4. Launch Valheim. You should see BepInEx load up, and the console window should quickly mention `[Info   :SimpleBackup] SimpleBackup v0.0.1 loaded!`.
+## Phase 1: Installation & Setup (via r2modman)
+1. Open your project folder and run `.\build_release.ps1` to ensure you build the absolute latest version and generate a fresh Zip.
+2. Open **r2modman** (or Thunderstore Mod Manager) and select your Valheim testing profile.
+3. On the left sidebar, click **Settings**, then search for or find **Import local mod**.
+4. Click `Select file` and navigate to your newly generated `releases\SimpleBackup-v0.0.1.zip`!
+5. Launch Valheim via the **Start modded** button in r2modman. You should see the terminal load up, mentioning `[Info   :SimpleBackup] SimpleBackup v0.0.1 loaded!`.
 
 ## Phase 2: In-Game UI Validation
 1. Create a **throwaway Test World** and a **Test Character** specifically for validation. Do not test on your main 400-hour server yet!
