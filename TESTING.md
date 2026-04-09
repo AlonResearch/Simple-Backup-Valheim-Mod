@@ -6,7 +6,7 @@ Before uploading the mod to NexusMods or Thunderstore for thousands of users to 
 1. Open your project folder and run `.\build_release.ps1` to ensure you build the absolute latest version and generate a fresh Zip.
 2. Open **r2modman** (or Thunderstore Mod Manager) and select your Valheim testing profile.
 3. On the left sidebar, click **Settings**, then search for or find **Import local mod**.
-4. Click `Select file` and navigate to your newly generated `releases\SimpleBackup-v0.0.1.zip`!
+4. Click `Select file` and navigate to your newly generated `releases\Aloncifer-SimpleBackup-0.0.1.zip`!
 5. Launch Valheim via the **Start modded** button in r2modman. You should see the terminal load up, mentioning `[Info   :SimpleBackup] SimpleBackup v0.0.1 loaded!`.
 
 ## Phase 2: In-Game UI Validation

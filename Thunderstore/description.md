@@ -1,10 +1,10 @@
 <div align="center">
-  <h1>🛡️ SimpleBackup 1.0.0</h1>
+  <h1>🛡️ SimpleBackup 0.0.1 Beta</h1>
   <b>Back up your worlds & characters without affecting your game performance!</b>
 </div>
 
 **Native Major Version:** Valheim 0.217+  
-**Source Code:** [GitHub Placeholder]  
+**Source Code:** [GitHub Repository](https://github.com/AlonResearch/Simple-Backup-Valheim-Mod)  
 **Donation Link:** [PayPal / Ko-fi Placeholder]  
 **Discord Server:** [Discord Placeholder]  
 
@@ -61,8 +61,11 @@ ________________________________________________
 ### 📥 Installation 
 
 1. Ensure you have the core framework **BepInExPack Valheim** installed.
-2. Download the `SimpleBackup_1.0.0.zip` file.
-3. Drop `SimpleBackup.dll` directly into your `Valheim/BepInEx/plugins/` folder.
+1. Ensure you have the core framework **BepInExPack Valheim** installed.
+2. Download the `Aloncifer-SimpleBackup-0.0.1.zip` file.
+3. Open **r2modman** (or Thunderstore Mod Manager) and your Valheim profile.
+4. Go to **Settings** -> **Import local mod** and select the `.zip` file.
+Alternatively, you can manually drop `SimpleBackup.dll` into your `Valheim/BepInEx/plugins/` folder.
 4. Boot Valheim once to automatically render the configuration file!
 
 ________________________________________________
