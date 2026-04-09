@@ -15,101 +15,119 @@ namespace SimpleBackup
         {
             if (__instance == null) return;
 
-            new Terminal.ConsoleCommand(
-                "sb.restore",
-                "Restores the latest backup for a given save file base name (e.g., 'sb.restore MyWorld')",
-                (Terminal.ConsoleEventArgs args) =>
-                {
-                    if (args.Length < 2)
-                    {
-                        args.Context.AddString("Usage: sb.restore <SaveName>");
-                        return;
-                    }
+            RegisterCommands(__instance);
+            SimpleBackupPlugin.Log.LogInfo("sb. Commands Registered/Verified in Postfix.");
+        }
 
-                    string saveName = args[1];
-                    RestoreLatestBackup(saveName, args.Context);
-                },
-                isCheat: false,
-                isNetwork: false,
-                onlyServer: false,
-                isSecret: false
-            );
-
-            new Terminal.ConsoleCommand(
-                "sb.backup",
-                "Triggers a backup. Usage: sb.backup [char|world]. No arguments backs up both (if applicable).",
-                (Terminal.ConsoleEventArgs args) =>
-                {
-                    string option = args.Length >= 2 ? args[1].ToLower() : "both";
-                    
-                    if (option == "char" || option == "both")
+        private static void RegisterCommands(Terminal terminal)
+        {
+            if (!Terminal.commands.ContainsKey("sb.restore"))
+            {
+                new Terminal.ConsoleCommand(
+                    "sb.restore",
+                    "Restores the latest backup for a given save file base name (e.g., 'sb.restore MyWorld')",
+                    (Terminal.ConsoleEventArgs args) =>
                     {
-                        string cName = Player.m_localPlayer != null ? Player.m_localPlayer.GetPlayerName() : null;
-                        if (!string.IsNullOrEmpty(cName))
+                        if (args.Length < 2)
                         {
-                            args.Context.AddString($"Starting background backup for character: {cName}...");
-                            System.Threading.Tasks.Task.Run(() => BackupManager.PerformFullBackup(null, cName));
+                            args.Context.AddString("Usage: sb.restore <SaveName>");
+                            return;
                         }
-                        else if (option == "char")
-                        {
-                            args.Context.AddString("ERROR: No active character found. Please load into the game first.");
-                        }
-                    }
 
-                    if (option == "world" || option == "both")
+                        string saveName = args[1];
+                        RestoreLatestBackup(saveName, args.Context);
+                    },
+                    isCheat: false,
+                    isNetwork: false,
+                    onlyServer: false,
+                    isSecret: false
+                );
+            }
+
+            if (!Terminal.commands.ContainsKey("sb.backup"))
+            {
+                new Terminal.ConsoleCommand(
+                    "sb.backup",
+                    "Triggers a backup. Usage: sb.backup [char|world]. No arguments backs up both (if applicable).",
+                    (Terminal.ConsoleEventArgs args) =>
                     {
-                        if (ZNet.instance != null && ZNet.instance.IsServer())
+                        string option = args.Length >= 2 ? args[1].ToLower() : "both";
+                        
+                        if (option == "char" || option == "both")
                         {
-                            string wName = ZNet.instance.GetWorldName();
-                            if (!string.IsNullOrEmpty(wName))
+                            string cName = Player.m_localPlayer != null ? Player.m_localPlayer.GetPlayerName() : null;
+                            if (!string.IsNullOrEmpty(cName))
                             {
-                                args.Context.AddString($"Starting background backup for world: {wName}...");
-                                System.Threading.Tasks.Task.Run(() => BackupManager.PerformFullBackup(wName, null));
+                                args.Context.AddString($"Starting background backup for character: {cName}...");
+                                System.Threading.Tasks.Task.Run(() => BackupManager.PerformFullBackup(null, cName));
+                            }
+                            else if (option == "char")
+                            {
+                                args.Context.AddString("ERROR: No active character found. Please load into the game first.");
                             }
                         }
-                        else if (option == "world")
+
+                        if (option == "world" || option == "both")
                         {
-                            args.Context.AddString("ERROR: You can only backup a world if you are actively hosting it locally.");
+                            if (ZNet.instance != null && ZNet.instance.IsServer())
+                            {
+                                string wName = ZNet.instance.GetWorldName();
+                                if (!string.IsNullOrEmpty(wName))
+                                {
+                                    args.Context.AddString($"Starting background backup for world: {wName}...");
+                                    System.Threading.Tasks.Task.Run(() => BackupManager.PerformFullBackup(wName, null));
+                                }
+                            }
+                            else if (option == "world")
+                            {
+                                args.Context.AddString("ERROR: You can only backup a world if you are actively hosting it locally.");
+                            }
                         }
-                    }
-                    
-                    if (option != "char" && option != "world" && option != "both")
-                    {
-                        args.Context.AddString("Unknown option. Usage: sb.backup [char|world]");
-                    }
-                },
-                isCheat: false,
-                isNetwork: false,
-                onlyServer: false,
-                isSecret: false
-            );
+                        
+                        if (option != "char" && option != "world" && option != "both")
+                        {
+                            args.Context.AddString("Unknown option. Usage: sb.backup [char|world]");
+                        }
+                    },
+                    isCheat: false,
+                    isNetwork: false,
+                    onlyServer: false,
+                    isSecret: false
+                );
+            }
 
-            new Terminal.ConsoleCommand(
-                "sb.list",
-                "Lists available backups.",
-                (Terminal.ConsoleEventArgs args) =>
-                {
-                    var backups = BackupManager.GetAllAvailableBackups();
-                    if (backups.Count == 0)
+            if (!Terminal.commands.ContainsKey("sb.list"))
+            {
+                new Terminal.ConsoleCommand(
+                    "sb.list",
+                    "Lists available backups.",
+                    (Terminal.ConsoleEventArgs args) =>
                     {
-                        args.Context.AddString("No backups found.");
-                        return;
-                    }
+                        var backups = BackupManager.GetAllAvailableBackups();
+                        if (backups.Count == 0)
+                        {
+                            args.Context.AddString("No backups found.");
+                            return;
+                        }
 
-                    int displayCount = Math.Min(15, backups.Count);
-                    args.Context.AddString($"Found {backups.Count} backups. Showing last {displayCount}:");
-                    
-                    var sorted = backups.OrderByDescending(f => File.GetCreationTime(f)).Take(displayCount).ToList();
-                    foreach (var b in sorted)
-                    {
-                        args.Context.AddString($"- {Path.GetFileName(b)}");
-                    }
-                },
-                isCheat: false,
-                isNetwork: false,
-                onlyServer: false,
-                isSecret: false
-            );
+                        int displayCount = Math.Min(15, backups.Count);
+                        args.Context.AddString($"Found {backups.Count} backups. Showing last {displayCount}:");
+                        
+                        var sorted = backups.OrderByDescending(f => File.GetCreationTime(f)).Take(displayCount).ToList();
+                        foreach (var b in sorted)
+                        {
+                            args.Context.AddString($"- {Path.GetFileName(b)}");
+                        }
+                    },
+                    isCheat: false,
+                    isNetwork: false,
+                    onlyServer: false,
+                    isSecret: false
+                );
+            }
+
+            // Force the console to rebuild its suggestions list
+            terminal.updateCommandList();
         }
 
         private static void RestoreLatestBackup(string saveName, Terminal context)
