@@ -41,8 +41,7 @@ Copy-Item "README.md" -Destination $TempDir
 $ManifestContent = Get-Content "Thunderstore\manifest.json" | ConvertFrom-Json
 $Version = $ManifestContent.version_number
 
-$TrueName = $ManifestContent.name -replace "^.*?-", ""
-$ZipName = "releases\$TrueName-v$Version.zip"
+$ZipName = "releases\$($ManifestContent.name)-$Version.zip"
 
 if (Test-Path $ZipName) {
     Remove-Item -Force $ZipName
