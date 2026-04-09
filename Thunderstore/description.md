@@ -1,6 +1,6 @@
 <div align="center">
-  <h1>🛡️ SimpleBackup 0.0.1 Beta</h1>
-  <b>Back up your worlds & characters without affecting your game performance!</b>
+  <h1>🛡️ SimpleBackup 0.0.1 ALPHA MVP</h1>
+  <b>The rock-solid 1-click backup solution for Valheim!</b>
 </div>
 
 **Native Major Version:** Valheim 0.217+  
@@ -16,23 +16,18 @@ First of all, you can save massive amounts of disk space! SimpleBackup is design
 ________________________________________________
 
 ### ✨ Features:
-* **no performance impact:** this plugin runs every `.zip` compression natively in asynchronous threaded mode, so you won't notice any impact on your framerate
-* **1-click UI integration:** an easily accessible "Backup" button perfectly tucked beneath the "Save" button inside the Valheim Esc Menu
-* **automatic Backup creation:** set configurable timers to run quietly in the background (e.g. every 30 minutes)
-* **storage retention control:** automatic deletion of old backups to save storage space (default: automatically limits to your youngest 5 files)
-* **safe '.old' restoration guard:** never corrupt your game! SimpleBackup guarantees absolute safety by temporarily appending your currently active (potentially corrupted) world files with `.old` before securely unpacking your historic backup zip
-* **steam cloud & local friendly:** seamlessly scans your Windows Registry keys to track Steam Cloud remote folders (`892970/remote`) and Valheim's modern 2022 `worlds_local` directories automatically without any messy configuration
+* **[STABLE] Async Threading:** Zero performance impact. Backups run quietly in the background.
+* **[STABLE] 1-Click UI:** A "Backup" button perfectly integrated into your Esc Menu.
+* **[STABLE] Smart Targeting:** Automatically backs up both World/Character if you are hosting, or only Character if you are a guest.
+* **[ROADMAP] Unified Commands:** `sb.list` and `sb.backup` for advanced control (Experimental).
+* **[ROADMAP] Safe Restoration:** `sb.restore` logic with `.old` guard (Experimental).
 
 ________________________________________________
 
-### ⚙️ Commands (F5 Console):
-Because forcefully overwriting heavily compressed `.fwl` and `.db` files while Valheim's engine is actively rendering them will instantly crash the game, SimpleBackup intelligently forces restoration queries from the absolute safety of the Main Menu F5 Console!
-
-> **`sb.list`** - shows a clean horizontal list of all currently available zip backups your system has secured. 
-
-> **`sb.backup [char|world]`** - in-game command to manually trigger a zip compression specifically for your current character (`sb.backup char`) or world (`sb.backup world`). No arguments backs up both.
-
-> **`sb.restore <name>`** - securely renames your active target files to `.old` to prevent data-loss, and magically unpacks the ZIP exactly back into the Valheim root directories! *(Example: `sb.restore MyWorld`)*
+### ⚙️ How to use:
+1. Open the **Esc Menu** while playing.
+2. Click **Backup**.
+3. Check your `BepInEx/plugins/SimpleBackup/Backups` folder for your new `.zip`!
 
 ________________________________________________
 
