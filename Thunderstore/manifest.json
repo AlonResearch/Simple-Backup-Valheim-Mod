@@ -1,5 +1,5 @@
 {
-    "name": "SimpleBackup",
+    "name": "AlonResearch-SimpleBackup",
     "version_number": "0.0.1",
     "website_url": "",
     "description": "A robust background backup solution for Valheim that protects your worlds and characters using smart zip compression.",
