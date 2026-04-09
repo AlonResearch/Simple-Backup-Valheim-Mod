@@ -24,24 +24,9 @@ $DebugDll = "src\bin\Debug\net462\SimpleBackup.dll"
 if (Test-Path $ReleaseDll) {
     Write-Host "   -> Found Release DLL"
     Copy-Item $ReleaseDll -Destination $TempDir
-    
-    $BinDir = Split-Path $ReleaseDll
-    $MonoModDlls = Get-ChildItem "$BinDir\MonoMod.*.dll"
-    foreach ($dll in $MonoModDlls) {
-        Write-Host "   -> Copying dependency: $($dll.Name)"
-        Copy-Item $dll.FullName -Destination $TempDir
-    }
 } elseif (Test-Path $DebugDll) {
     Write-Host "   -> Found Debug DLL"
     Copy-Item $DebugDll -Destination $TempDir
-    
-    # Copy MonoMod dependencies that are required by the modern Harmony link
-    $BinDir = Split-Path $DebugDll
-    $MonoModDlls = Get-ChildItem "$BinDir\MonoMod.*.dll"
-    foreach ($dll in $MonoModDlls) {
-        Write-Host "   -> Copying dependency: $($dll.Name)"
-        Copy-Item $dll.FullName -Destination $TempDir
-    }
 } else {
     Write-Host "Error: Could not find compiled DLL! Make sure the build succeeds." -ForegroundColor Red
     exit 1
