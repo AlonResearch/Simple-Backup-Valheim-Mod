@@ -1,6 +1,7 @@
 using HarmonyLib;
 using UnityEngine;
 using UnityEngine.UI;
+using TMPro;
 
 namespace SimpleBackup
 {
@@ -11,37 +12,45 @@ namespace SimpleBackup
         [HarmonyPostfix]
         public static void Start_Postfix(Menu __instance)
         {
-            // Valheim's escape menu typically holds elements in a child named "Menu" or "MENU"
-            Transform menuRoot = __instance.transform.Find("menu") ?? __instance.transform.Find("MENU") ?? __instance.transform.Find("MenuContainer");
+            if (__instance == null || __instance.m_menuDialog == null) return;
 
-            if (menuRoot == null)
+            Transform menuEntries = __instance.m_menuDialog.transform.Find("MenuEntries");
+            if (menuEntries == null)
             {
-                // Fallback attempt to find save button directly
-                Transform possibleSaveBtn = __instance.transform.Find("MENU/Save") ?? __instance.transform.Find("menu/Save");
-                if (possibleSaveBtn != null)
-                {
-                    menuRoot = possibleSaveBtn.parent;
-                }
+                 // Fallback for different UI versions
+                 menuEntries = __instance.m_menuDialog.transform.Find("menu") ?? 
+                               __instance.m_menuDialog.transform.Find("MENU") ?? 
+                               __instance.m_menuDialog.transform.Find("MenuContainer");
             }
 
-            if (menuRoot != null)
+            if (menuEntries != null)
             {
-                Transform saveButton = menuRoot.Find("Save") ?? menuRoot.Find("SaveBtn") ?? menuRoot.Find("ButtonSave");
+                // Clone the 'Settings' button as it's the most stable anchor
+                Transform settingsButton = menuEntries.Find("Settings") ?? 
+                                            menuEntries.Find("ButtonSettings") ??
+                                            menuEntries.Find("SettingsBtn");
 
-                if (saveButton != null)
+                if (settingsButton != null)
                 {
-                    SimpleBackupPlugin.Log.LogInfo("Found Save button in Esc Menu, injecting Backup button.");
+                    SimpleBackupPlugin.Log.LogInfo("Found Settings button in Esc Menu, injecting Backup button.");
 
-                    GameObject backupButtonObj = GameObject.Instantiate(saveButton.gameObject, menuRoot);
+                    GameObject backupButtonObj = GameObject.Instantiate(settingsButton.gameObject, menuEntries);
                     backupButtonObj.name = "BackupGame";
                     
-                    int saveBtnIndex = saveButton.GetSiblingIndex();
-                    backupButtonObj.transform.SetSiblingIndex(saveBtnIndex + 1);
+                    int settingsBtnIndex = settingsButton.GetSiblingIndex();
+                    backupButtonObj.transform.SetSiblingIndex(settingsBtnIndex + 1);
 
-                    Text btnText = backupButtonObj.GetComponentInChildren<Text>();
+                    // Modern Valheim uses TextMeshPro (TMP_Text)
+                    TMP_Text btnText = backupButtonObj.GetComponentInChildren<TMP_Text>();
                     if (btnText != null)
                     {
                         btnText.text = "Backup";
+                    }
+                    else
+                    {
+                        // Fallback for older UI
+                        Text legacyText = backupButtonObj.GetComponentInChildren<Text>();
+                        if (legacyText != null) legacyText.text = "Backup";
                     }
 
                     Button btn = backupButtonObj.GetComponent<Button>();
@@ -50,12 +59,10 @@ namespace SimpleBackup
                         btn.onClick.RemoveAllListeners();
                         btn.onClick.AddListener(() =>
                         {
-                            // Only backup the world if you are hosting it (ZNet.instance.IsServer())
                             string wName = (ZNet.instance != null && ZNet.instance.IsServer()) ? ZNet.instance.GetWorldName() : null;
                             string cName = Player.m_localPlayer != null ? Player.m_localPlayer.GetPlayerName() : null;
 
                             SimpleBackupPlugin.Log.LogInfo($"Manual UI Backup Triggered! Target: {wName}/{cName}");
-                            // Run the backup on a background thread so the game does not freeze
                             System.Threading.Tasks.Task.Run(() => BackupManager.PerformFullBackup(wName, cName));
                             
                             if (MessageHud.instance != null)
@@ -63,15 +70,19 @@ namespace SimpleBackup
                                 MessageHud.instance.ShowMessage(MessageHud.MessageType.Center, "Session Backup Started in Background!");
                             }
                         });
+
+                        // Ensure controller/keyboard navigation works by cloning the settings button's navigation
+                        btn.navigation = settingsButton.GetComponent<Button>().navigation;
                     }
-                    
-                    // Valheim's Menu generally uses a VerticalLayoutGroup.
-                    // Adding a sibling dynamically automatically adjusts the layout spacing for compatible mods!
                 }
                 else
                 {
-                    SimpleBackupPlugin.Log.LogWarning("Could not find the Save button in the Esc Menu.");
+                    SimpleBackupPlugin.Log.LogWarning("Could not find the Settings button in the Esc Menu container.");
                 }
+            }
+            else
+            {
+                SimpleBackupPlugin.Log.LogWarning("Could not find the MenuEntries container in the Esc Menu.");
             }
         }
     }
