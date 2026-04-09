@@ -17,7 +17,29 @@ This initial release focuses on the core user experience: **The Manual Backup Bu
 ## ⚙️ How it Works
 1. Press **Esc** while playing.
 2. Click the new **Backup** button.
-3. Your character and world files are instantly compressed into a `.zip` in your `BepInEx/plugins/SimpleBackup/Backups` folder.
+3. Your character and world files are instantly compressed securely into a `.zip` in the background.
+
+---
+
+## 📂 Where Are My Backups?
+
+Your `.zip` archives are stored safely next to Valheim's standard save folders!
+To find them, paste this into your Windows File Explorer address bar:
+`%USERPROFILE%\AppData\LocalLow\IronGate\Valheim\SimpleBackup`
+
+*(Alternatively, navigate to `C:\Users\YOUR_NAME\AppData\LocalLow\IronGate\Valheim\SimpleBackup`)*
+
+Inside this directory, they are sorted into subfolders such as `SteamCloud_characters` or `Local_worlds`.
+
+---
+
+## 🔄 How to Manually Restore a Backup
+
+1. Navigate to the Valheim saves folder: `%USERPROFILE%\AppData\LocalLow\IronGate\Valheim`
+2. Open the `characters` or `worlds` folder (or `remote`/`SteamCloud` equivalent) that you want to restore.
+3. **Delete** or move your current broken files (e.g., `MyChar.fch`).
+4. Find your compressed backup in `%USERPROFILE%\AppData\LocalLow\IronGate\Valheim\SimpleBackup`.
+5. Open the `.zip` and simply drag and drop the files back into Valheim's save folder!
 
 ---
 
@@ -32,8 +54,18 @@ The following features are currently in development/experimental and will be ful
 ---
 
 ## 📥 Installation
+
+**Option A: Mod Manager (Recommended)**
+1. Open **r2modman** or **Thunderstore Mod Manager**.
+2. Search for **SimpleBackup** by Aloncifer and click Install.
+3. (Alternatively) Download the `.zip` from Thunderstore/Releases and drag-and-drop the entire `.zip` file into the mod manager's interface.
+
+<details>
+<summary><b>Option B: Manual Installation</b></summary>
+
 1. Install **BepInExPack Valheim**.
 2. Download `Aloncifer-SimpleBackup-0.0.1.zip` from the [Releases](https://github.com/AlonResearch/Simple-Backup-Valheim-Mod/releases) page.
-3. drag and drop the `.dll` into `BepInEx/plugins`.
+3. Extract the `.zip` contents directly into your Valheim installation folder so that `SimpleBackup.dll` is placed inside `BepInEx/plugins`.
+</details>
 
 *Developed by Aloncifer.*
