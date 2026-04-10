@@ -1,6 +1,6 @@
 # TESTING GUIDE: SimpleBackup (Current Ground Truth)
 
-This test plan validates all currently implemented backup features, including save-sync reliability, strict target behavior, indicator UX, and backup duration toasts.
+This test plan validates all currently implemented backup features, including save-sync reliability, strict target behavior, indicator UX, duration toasts, and cross-build save-trigger compatibility.
 
 ## 1. Prerequisites
 
@@ -64,7 +64,7 @@ Character freshness:
 Expected:
 
 1. Restored character includes the latest change.
-2. If save-sync cannot be confirmed, backup is canceled (not silently stale).
+2. If SaveSystem trigger is unavailable on this build, backup still runs via compatibility fallback.
 
 World freshness:
 
@@ -158,14 +158,27 @@ Expected:
 2. Warnings/errors appear only for actionable problems (sync unavailable, target unavailable, etc.).
 3. No noisy repetitive spam each frame.
 
-## 14. Regression Checklist
+## 14. Save Trigger Compatibility Regression
+
+1. Start game on current build and trigger backup once.
+2. Inspect logs for save trigger routing.
+
+Expected:
+
+1. One of these paths is used:
+1. SaveSystem trigger path.
+2. ZNet fallback trigger path.
+2. Backup should not hard-fail repeatedly only because SaveSystem trigger is missing.
+3. If both trigger paths are unavailable, backup proceeds best-effort and logs a warning.
+
+## 15. Regression Checklist
 
 1. Esc menu remains usable and responsive.
 2. No game freeze during backup operations.
 3. No corrupted save identity after restore.
 4. No command registration regressions (`sb.backup` present after loading).
 
-## 15. Failure Report Template
+## 16. Failure Report Template
 
 Include all items below for failed scenarios:
 
@@ -177,7 +190,7 @@ Include all items below for failed scenarios:
 6. Relevant BepInEx/Player.log excerpt.
 7. Manage Saves screenshots before/after.
 
-## 16. Pass Criteria
+## 17. Pass Criteria
 
 Build passes when all are true:
 

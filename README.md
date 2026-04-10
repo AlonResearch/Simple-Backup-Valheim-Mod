@@ -10,7 +10,7 @@ SimpleBackup currently provides:
 2. Console commands: `sb.backup`, `sb.backup world`, `sb.backup char`, `sb.list`.
 3. Automatic timed backups (optional) via config.
 4. Native backup creation through Valheim save APIs.
-5. Save-before-backup synchronization (best effort, fail-closed when unconfirmed).
+5. Save-before-backup synchronization with compatibility fallback.
 6. Single-flight execution with cooldown guard.
 7. Minimalist UX messaging with duration in completion/failure toasts.
 8. Flashing top-right backup indicator while backup is running.
@@ -21,8 +21,8 @@ Every trigger path (button, command, timer) follows the same pipeline:
 
 1. Resolve requested target intent.
 2. Enter coordinator gate (no overlap, short cooldown).
-3. Trigger native save sync before backup.
-4. Confirm save completion when possible.
+3. Trigger native save sync before backup (SaveSystem path when available).
+4. Fall back to ZNet save trigger when SaveSystem trigger is unavailable on this game build.
 5. Create native backup(s) for selected target(s).
 6. Emit concise completion/failure toast with elapsed time.
 
@@ -31,7 +31,8 @@ Important behavior details:
 1. Explicit target commands are strict.
 2. `sb.backup world` will not silently fall back to character.
 3. `sb.backup char` will not silently fall back to world.
-4. If current-state save sync cannot be confirmed, backup is canceled instead of producing a stale snapshot.
+4. If neither save trigger is available, backup continues in best-effort mode after a short settle delay.
+5. If a save status method exists but completion cannot be confirmed within timeout, backup is canceled to avoid stale snapshots.
 
 ## User Experience
 
@@ -84,3 +85,4 @@ Config file: `com.aloncifer.simplebackup.cfg`
 
 1. The backup badge uses IMGUI; icon glyph rendering can vary by system font.
 2. Native restore/list rendering is still Valheim-owned UI behavior.
+3. Save trigger availability differs by Valheim build. This plugin supports SaveSystem trigger first, then ZNet fallback.
