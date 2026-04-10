@@ -6,11 +6,22 @@ using System.Linq;
 using Microsoft.Win32;
 using UnityEngine;
 using System.Text.RegularExpressions;
+using System.Reflection;
+using System.Threading;
 
 namespace SimpleBackup
 {
     public static class BackupManager
     {
+        private const int SaveSyncTimeoutMs = 10000;
+        private const int SavePollIntervalMs = 100;
+        private const int SaveSettleDelayMs = 350;
+
+        private static readonly object _saveSyncInitGate = new object();
+        private static bool _saveSyncInitialized;
+        private static MethodInfo _nativeSaveTriggerMethod;
+        private static MethodInfo _nativeSaveInProgressMethod;
+
         public enum BackupSaveType
         {
             Unknown,
@@ -52,14 +63,18 @@ namespace SimpleBackup
 
         public static void PerformFullBackup(string targetWorld = null, string targetCharacter = null)
         {
-            SimpleBackupPlugin.Log.LogInfo("Starting native backup procedure...");
-
             if (ZNet.instance == null)
             {
-                string message = "Backup skipped because the native Valheim save backend is not available in the current scene.";
+                string message = "Backup unavailable in this scene.";
                 SimpleBackupPlugin.QueueUIMessage(message);
                 SimpleBackupPlugin.Log.LogWarning(message);
                 return;
+            }
+
+            bool syncSuccessful = TrySyncLiveStateBeforeBackup();
+            if (!syncSuccessful)
+            {
+                SimpleBackupPlugin.Log.LogWarning("Proceeding with backup without confirmed native save sync; backup may reflect the latest persisted save state.");
             }
 
             var backupItems = new List<string>();
@@ -107,16 +122,150 @@ namespace SimpleBackup
             if (backupItems.Count > 0)
             {
                 string scope = string.Join(" and ", backupItems.Distinct().ToArray());
-                string msg = $"Native backup complete for {scope}.";
+                string msg = $"Backup complete: {scope}.";
                 SimpleBackupPlugin.QueueUIMessage(msg);
                 SimpleBackupPlugin.Log.LogInfo(msg);
             }
             else
             {
-                string msg = "No current character or hosted world was available for native backup.";
+                string msg = "No eligible save target found.";
                 SimpleBackupPlugin.QueueUIMessage(msg);
                 SimpleBackupPlugin.Log.LogWarning(msg);
             }
+        }
+
+        private static bool TrySyncLiveStateBeforeBackup()
+        {
+            try
+            {
+                EnsureSaveSyncMethodsInitialized();
+
+                if (_nativeSaveTriggerMethod == null)
+                {
+                    SimpleBackupPlugin.Log.LogWarning("No compatible native save trigger method was found on SaveSystem.");
+                    return false;
+                }
+
+                _nativeSaveTriggerMethod.Invoke(null, null);
+                SimpleBackupPlugin.Log.LogDebug($"Triggered native save via SaveSystem.{_nativeSaveTriggerMethod.Name}().");
+
+                if (_nativeSaveInProgressMethod != null)
+                {
+                    var timeoutAt = DateTime.UtcNow.AddMilliseconds(SaveSyncTimeoutMs);
+                    while (DateTime.UtcNow < timeoutAt)
+                    {
+                        bool inProgress;
+                        if (!TryReadSaveInProgress(out inProgress))
+                        {
+                            break;
+                        }
+
+                        if (!inProgress)
+                        {
+                            break;
+                        }
+
+                        Thread.Sleep(SavePollIntervalMs);
+                    }
+                }
+
+                Thread.Sleep(SaveSettleDelayMs);
+                return true;
+            }
+            catch (Exception ex)
+            {
+                SimpleBackupPlugin.Log.LogWarning($"Failed while syncing live save state before backup: {ex.Message}");
+                return false;
+            }
+        }
+
+        private static bool TryReadSaveInProgress(out bool inProgress)
+        {
+            inProgress = false;
+
+            try
+            {
+                if (_nativeSaveInProgressMethod == null)
+                {
+                    return false;
+                }
+
+                object raw = _nativeSaveInProgressMethod.Invoke(null, null);
+                if (raw is bool)
+                {
+                    inProgress = (bool)raw;
+                    return true;
+                }
+            }
+            catch (Exception ex)
+            {
+                SimpleBackupPlugin.Log.LogWarning($"Could not evaluate SaveSystem.{_nativeSaveInProgressMethod.Name}(): {ex.Message}");
+            }
+
+            return false;
+        }
+
+        private static void EnsureSaveSyncMethodsInitialized()
+        {
+            if (_saveSyncInitialized)
+            {
+                return;
+            }
+
+            lock (_saveSyncInitGate)
+            {
+                if (_saveSyncInitialized)
+                {
+                    return;
+                }
+
+                BindingFlags flags = BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic;
+                MethodInfo[] methods = typeof(SaveSystem).GetMethods(flags);
+
+                _nativeSaveTriggerMethod =
+                    FindMethod(methods, "Save", "SaveGame", "WriteSave", "SaveWorldAndCharacter") ??
+                    FindMethodContaining(methods, "save");
+
+                _nativeSaveInProgressMethod =
+                    FindMethod(methods, "IsSaving", "IsInProgress", "SaveInProgress", "IsBusy") ??
+                    FindBoolNoArgMethodContaining(methods, "progress", "saving", "busy");
+
+                SimpleBackupPlugin.Log.LogDebug(
+                    $"Native save sync support: trigger={(_nativeSaveTriggerMethod != null ? _nativeSaveTriggerMethod.Name : "none")}, status={(_nativeSaveInProgressMethod != null ? _nativeSaveInProgressMethod.Name : "none")}");
+
+                _saveSyncInitialized = true;
+            }
+        }
+
+        private static MethodInfo FindMethod(MethodInfo[] methods, params string[] names)
+        {
+            foreach (string name in names)
+            {
+                MethodInfo match = methods.FirstOrDefault(m =>
+                    string.Equals(m.Name, name, StringComparison.OrdinalIgnoreCase) &&
+                    m.GetParameters().Length == 0);
+                if (match != null)
+                {
+                    return match;
+                }
+            }
+
+            return null;
+        }
+
+        private static MethodInfo FindMethodContaining(MethodInfo[] methods, string token)
+        {
+            return methods.FirstOrDefault(m =>
+                m.GetParameters().Length == 0 &&
+                m.Name.IndexOf(token, StringComparison.OrdinalIgnoreCase) >= 0);
+        }
+
+        private static MethodInfo FindBoolNoArgMethodContaining(MethodInfo[] methods, params string[] tokens)
+        {
+            return methods.FirstOrDefault(m =>
+                m.GetParameters().Length == 0 &&
+                m.ReturnType == typeof(bool) &&
+                tokens.Any(token => m.Name.IndexOf(token, StringComparison.OrdinalIgnoreCase) >= 0));
         }
 
         private static bool TryCreateNativeBackup(string saveName, SaveDataType saveDataType)
@@ -140,7 +289,7 @@ namespace SimpleBackup
                 bool created = InvokeMoveToBackup(primary, DateTime.Now);
                 if (created)
                 {
-                    SimpleBackupPlugin.Log.LogInfo($"Native backup created for {DescribeNativeTarget(saveDataType == SaveDataType.World ? BackupSaveType.World : BackupSaveType.Character, saveName)}");
+                    SimpleBackupPlugin.Log.LogDebug($"Native backup created for {DescribeNativeTarget(saveDataType == SaveDataType.World ? BackupSaveType.World : BackupSaveType.Character, saveName)}");
                 }
                 else
                 {
