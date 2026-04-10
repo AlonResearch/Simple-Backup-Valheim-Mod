@@ -48,6 +48,11 @@ namespace SimpleBackup
                 string folderName = new DirectoryInfo(dir).Name; // "worlds", "characters", "worlds_local", etc.
                 bool isCharacter = folderName.Contains("character");
 
+                if (!ShouldBackupDirectory(isCharacter, targetWorld, targetCharacter))
+                {
+                    continue;
+                }
+
                 var metrics = BackupDirectory(dir, isCharacter, targetWorld, targetCharacter);
                 successCount += metrics.Count;
                 totalBytes += metrics.Bytes;
@@ -121,6 +126,19 @@ namespace SimpleBackup
             }
             
             return metrics;
+        }
+
+        private static bool ShouldBackupDirectory(bool isCharacterDirectory, string targetWorld, string targetCharacter)
+        {
+            bool wantsWorld = !string.IsNullOrEmpty(targetWorld);
+            bool wantsCharacter = !string.IsNullOrEmpty(targetCharacter);
+
+            if (!wantsWorld && !wantsCharacter)
+            {
+                return true;
+            }
+
+            return isCharacterDirectory ? wantsCharacter : wantsWorld;
         }
 
         private static void EnforceRetentionPolicy(string backupDirectory, string baseName)
