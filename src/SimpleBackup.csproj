@@ -56,6 +56,9 @@
     <Reference Include="UnityEngine.TextRenderingModule">
       <HintPath>$(ValheimInstallPath)\valheim_Data\Managed\UnityEngine.TextRenderingModule.dll</HintPath>
     </Reference>
+    <Reference Include="UnityEngine.IMGUIModule">
+      <HintPath>$(ValheimInstallPath)\valheim_Data\Managed\UnityEngine.IMGUIModule.dll</HintPath>
+    </Reference>
     <Reference Include="Unity.TextMeshPro">
       <HintPath>$(ValheimInstallPath)\valheim_Data\Managed\Unity.TextMeshPro.dll</HintPath>
     </Reference>

@@ -5,6 +5,8 @@ using HarmonyLib;
 using UnityEngine;
 using System.Reflection;
 using System.Collections.Concurrent;
+using System;
+using System.Threading;
 
 namespace SimpleBackup
 {
@@ -18,11 +20,27 @@ namespace SimpleBackup
         private Harmony _harmony;
         public static SimpleBackupPlugin Instance;
         private static readonly ConcurrentQueue<string> _uiMessageQueue = new ConcurrentQueue<string>();
+        private static int _backupIndicatorActive;
+        private static long _backupIndicatorStartTicks;
+        private static GUIStyle _backupIndicatorStyle;
 
         public static void QueueUIMessage(string msg)
         {
             _uiMessageQueue.Enqueue(msg);
         }
+
+        public static void SetBackupIndicatorActive(bool active)
+        {
+            if (active)
+            {
+                Interlocked.Exchange(ref _backupIndicatorActive, 1);
+                Interlocked.Exchange(ref _backupIndicatorStartTicks, DateTime.UtcNow.Ticks);
+                return;
+            }
+
+            Interlocked.Exchange(ref _backupIndicatorActive, 0);
+        }
+
         public static ManualLogSource Log;
 
         public static ConfigEntry<int> BackupIntervalMinutes;
@@ -106,6 +124,34 @@ namespace SimpleBackup
         private void OnDestroy()
         {
             _harmony?.UnpatchSelf();
+        }
+
+        private void OnGUI()
+        {
+            if (Volatile.Read(ref _backupIndicatorActive) != 1)
+            {
+                return;
+            }
+
+            if (_backupIndicatorStyle == null)
+            {
+                _backupIndicatorStyle = new GUIStyle(GUI.skin.label)
+                {
+                    alignment = TextAnchor.MiddleCenter,
+                    fontSize = 22,
+                    fontStyle = FontStyle.Bold,
+                    richText = true
+                };
+            }
+
+            float pulse = 0.35f + (0.65f * Mathf.Abs(Mathf.Sin(Time.unscaledTime * 5f)));
+            Color previous = GUI.color;
+            GUI.color = new Color(1f, 1f, 1f, pulse);
+
+            var badgeRect = new Rect(Screen.width - 74f, 18f, 56f, 38f);
+            GUI.Label(badgeRect, "🛡💾", _backupIndicatorStyle);
+
+            GUI.color = previous;
         }
     }
 }
