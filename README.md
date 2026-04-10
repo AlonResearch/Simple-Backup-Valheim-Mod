@@ -1,91 +1,86 @@
 # SimpleBackup
 
-SimpleBackup is a Valheim backup plugin that provides fast in-game backup triggers while using the game's native backup backend and native save ecosystem.
+SimpleBackup is a Valheim backup plugin that adds fast in-game backup triggers on top of Valheim's native backup system.
 
-## Current State
+## Ground Truth (Current Build)
 
-SimpleBackup runs on BepInEx 5 and Harmony and currently provides:
+SimpleBackup currently provides:
 
-1. Esc-menu backup button integrated into the existing pause menu.
-2. Console backup commands for targeted and combined backups.
-3. Automatic timed backups through plugin config.
-4. Native backup generation through Valheim save APIs.
-5. Main-thread-safe status messaging for user feedback.
+1. Esc-menu Backup button integrated under Save.
+2. Console commands: `sb.backup`, `sb.backup world`, `sb.backup char`, `sb.list`.
+3. Automatic timed backups (optional) via config.
+4. Native backup creation through Valheim save APIs.
+5. Save-before-backup synchronization (best effort, fail-closed when unconfirmed).
+6. Single-flight execution with cooldown guard.
+7. Minimalist UX messaging with duration in completion/failure toasts.
+8. Flashing top-right backup indicator while backup is running.
 
-## Current Validation Snapshot
+## Backup Pipeline
 
-Latest in-session validation confirms:
+Every trigger path (button, command, timer) follows the same pipeline:
 
-1. Manual backup from the Esc-menu button is working reliably.
-2. Native restore for both world and character is working in the same game session.
-3. Manual backup + native restore loop behaves seamlessly during active play testing.
+1. Resolve requested target intent.
+2. Enter coordinator gate (no overlap, short cooldown).
+3. Trigger native save sync before backup.
+4. Confirm save completion when possible.
+5. Create native backup(s) for selected target(s).
+6. Emit concise completion/failure toast with elapsed time.
 
-Validation currently in progress:
+Important behavior details:
 
-1. Console command behavior across host and non-host cases.
-2. Target-specific command paths (`sb.backup world`, `sb.backup char`) across edge cases.
-3. Steam Cloud synchronization interactions after command-triggered backups.
-4. Additional edge-case stability around mixed local/cloud save states.
+1. Explicit target commands are strict.
+2. `sb.backup world` will not silently fall back to character.
+3. `sb.backup char` will not silently fall back to world.
+4. If current-state save sync cannot be confirmed, backup is canceled instead of producing a stale snapshot.
 
-## Active Backup Flow
+## User Experience
 
-Every backup trigger (button, command, timer) goes through one coordinated flow:
+Design goals are minimal and informative:
 
-1. Determine active targets from game state.
-2. Start a single backup job through the coordinator gate.
-3. Call Valheim native backup creation per target.
-4. Report completion to UI and console.
+1. No center-screen backup spam.
+2. Flashing top-right backup badge while backup is running.
+3. Concise top-left toast on completion/failure/cancel with timing.
 
-Target behavior:
+Examples:
 
-1. Hosted session: world + character can be backed up.
-2. Client session: character backup is available.
-3. Explicit command mode supports world-only or character-only targeting.
+1. `Backup complete (1.8s): world 'MyWorld' and character 'test'.`
+2. `Backup failed (1.2s): requested target unavailable.`
+3. `Backup canceled (2.0s): could not confirm current save state.`
+4. `Backup on cooldown.`
+5. `Backup already running.`
 
-## Native Compatibility Direction
+## Target Rules
 
-Project direction is native-first backup compatibility:
+1. Hosted local world:
+1. `sb.backup world` backs up world.
+2. `sb.backup char` backs up character.
+3. Esc button and `sb.backup` attempt both.
+2. Non-host/client session:
+1. `sb.backup world` is blocked.
+2. Character backup paths remain available when character save is resolvable.
 
-1. Keep backup UX entry points in this mod.
-2. Keep generated backups compatible with Valheim's native backup/restore system.
-3. Use the game's existing save management surface as the primary restore/listing experience.
+## Commands
 
-This keeps backup creation accessible while aligning storage and restore behavior with Valheim-native conventions.
-
-## Runtime Architecture
-
-1. Plugin lifecycle: BepInEx plugin with Harmony patch registration.
-2. Backup execution: asynchronous jobs guarded by a single-flight coordinator and cooldown.
-3. Messaging: cross-thread queue consumed on Update for safe in-game notifications.
-4. Save awareness: world/character target resolution uses current ZNet and player state.
-
-## Commands and UX
-
-Available command surface:
-
-1. sb.backup
-2. sb.backup world
-3. sb.backup char
-4. sb.list
-
-Primary in-game UX:
-
-1. Backup button in Esc menu.
-2. Top-left completion and status messages.
+1. `sb.backup` - backup current available targets.
+2. `sb.backup world` - world only (host required).
+3. `sb.backup char` - character only.
+4. `sb.list` - lists legacy archive index entries.
 
 ## Configuration
 
-Config file: com.aloncifer.simplebackup.cfg
+Config file: `com.aloncifer.simplebackup.cfg`
 
-1. BackupIntervalMinutes: minutes between automatic backups. 0 disables timer.
-2. MaxBackupsToKeep: retention setting currently used by legacy archive indexing paths.
+1. `BackupIntervalMinutes`: timed backup interval. `0` disables scheduler.
+2. `MaxBackupsToKeep`: retained for legacy archive-index path compatibility.
 
 ## Build and Install
 
 1. Build target: .NET Framework 4.6.2.
-2. Output: SimpleBackup.dll for BepInEx plugins folder.
-3. Packaging: Thunderstore-ready layout with plugin DLL in plugins.
+2. Build command: `dotnet build SimpleBackup.sln -c Release`.
+3. Output: `src/bin/Release/net462/SimpleBackup.dll`.
+4. Install DLL to BepInEx plugins folder.
 
-## Project Direction Summary
+## Notes
 
-SimpleBackup is evolving into a native-compatible backup frontend: quick triggers, deterministic target selection, and backup outputs that integrate seamlessly with Valheim's own save and restore model.
+1. The backup badge uses IMGUI; icon glyph rendering can vary by system font.
+2. Native restore/list rendering is still Valheim-owned UI behavior.
