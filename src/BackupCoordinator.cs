@@ -6,15 +6,38 @@ namespace SimpleBackup
 {
     public static class BackupCoordinator
     {
+        public enum BackupStartResult
+        {
+            Started,
+            AlreadyRunning,
+            CooldownActive
+        }
+
+        private const int MinimumBackupIntervalSeconds = 10;
+        private static readonly object _backupGate = new object();
         private static int _backupInProgress;
+        private static long _lastBackupStartTicks;
 
         public static bool IsBackupInProgress => Volatile.Read(ref _backupInProgress) == 1;
 
-        public static bool TryStartBackup(string targetWorld, string targetCharacter)
+        public static BackupStartResult TryStartBackup(string targetWorld, string targetCharacter)
         {
-            if (Interlocked.CompareExchange(ref _backupInProgress, 1, 0) != 0)
+            long nowTicks = DateTime.UtcNow.Ticks;
+
+            lock (_backupGate)
             {
-                return false;
+                if (Volatile.Read(ref _backupInProgress) == 1)
+                {
+                    return BackupStartResult.AlreadyRunning;
+                }
+
+                if (IsWithinCooldown(nowTicks))
+                {
+                    return BackupStartResult.CooldownActive;
+                }
+
+                _backupInProgress = 1;
+                _lastBackupStartTicks = nowTicks;
             }
 
             Task.Run(() =>
@@ -30,11 +53,26 @@ namespace SimpleBackup
                 }
                 finally
                 {
-                    Volatile.Write(ref _backupInProgress, 0);
+                    lock (_backupGate)
+                    {
+                        Volatile.Write(ref _backupInProgress, 0);
+                    }
                 }
             });
 
-            return true;
+            return BackupStartResult.Started;
+        }
+
+        private static bool IsWithinCooldown(long nowTicks)
+        {
+            long lastStartTicks = Volatile.Read(ref _lastBackupStartTicks);
+            if (lastStartTicks == 0)
+            {
+                return false;
+            }
+
+            long elapsedTicks = nowTicks - lastStartTicks;
+            return elapsedTicks < TimeSpan.FromSeconds(MinimumBackupIntervalSeconds).Ticks;
         }
     }
 }

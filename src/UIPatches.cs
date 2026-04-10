@@ -66,7 +66,8 @@ namespace SimpleBackup
                             string wName = (ZNet.instance != null && ZNet.instance.IsServer()) ? ZNet.instance.GetWorldName() : null;
                             string cName = Player.m_localPlayer != null ? Player.m_localPlayer.GetPlayerName() : null;
 
-                            if (BackupCoordinator.TryStartBackup(wName, cName))
+                            BackupCoordinator.BackupStartResult startResult = BackupCoordinator.TryStartBackup(wName, cName);
+                            if (startResult == BackupCoordinator.BackupStartResult.Started)
                             {
                                 SimpleBackupPlugin.Log.LogInfo($"Manual UI Backup Triggered! Target: {wName}/{cName}");
                                 if (MessageHud.instance != null)
@@ -76,7 +77,10 @@ namespace SimpleBackup
                             }
                             else if (MessageHud.instance != null)
                             {
-                                MessageHud.instance.ShowMessage(MessageHud.MessageType.Center, "Backup already running.");
+                                string message = startResult == BackupCoordinator.BackupStartResult.CooldownActive
+                                    ? "Backup cooldown active. Please wait 10 seconds before starting another backup."
+                                    : "Backup already running.";
+                                MessageHud.instance.ShowMessage(MessageHud.MessageType.Center, message);
                             }
                         });
 

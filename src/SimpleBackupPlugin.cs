@@ -89,13 +89,21 @@ namespace SimpleBackup
                     string worldName = (ZNet.instance != null && ZNet.instance.IsServer()) ? ZNet.instance.GetWorldName() : null;
                     string charName = Player.m_localPlayer != null ? Player.m_localPlayer.GetPlayerName() : null;
 
-                    if (BackupCoordinator.TryStartBackup(worldName, charName))
+                    BackupCoordinator.BackupStartResult startResult = BackupCoordinator.TryStartBackup(worldName, charName);
+                    if (startResult == BackupCoordinator.BackupStartResult.Started)
                     {
                         Logger.LogInfo($"Performing scheduled automatic backup for World: {worldName} | Char: {charName}...");
                     }
                     else
                     {
-                        Logger.LogWarning("Skipped scheduled backup because another backup is already running.");
+                        if (startResult == BackupCoordinator.BackupStartResult.CooldownActive)
+                        {
+                            Logger.LogWarning("Skipped scheduled backup because the 10-second backup cooldown is active.");
+                        }
+                        else
+                        {
+                            Logger.LogWarning("Skipped scheduled backup because another backup is already running.");
+                        }
                     }
                 }
             }

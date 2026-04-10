@@ -107,13 +107,21 @@ namespace SimpleBackup
 
         private static void StartBackupFromConsole(Terminal context, string worldName, string characterName, string startMessage)
         {
-            if (BackupCoordinator.TryStartBackup(worldName, characterName))
+            BackupCoordinator.BackupStartResult startResult = BackupCoordinator.TryStartBackup(worldName, characterName);
+            if (startResult == BackupCoordinator.BackupStartResult.Started)
             {
                 context.AddString(startMessage);
             }
             else
             {
-                context.AddString("A backup is already running. Please wait for it to finish.");
+                if (startResult == BackupCoordinator.BackupStartResult.CooldownActive)
+                {
+                    context.AddString("Backup cooldown active. Please wait 10 seconds before starting another backup.");
+                }
+                else
+                {
+                    context.AddString("A backup is already running. Please wait for it to finish.");
+                }
             }
         }
 
