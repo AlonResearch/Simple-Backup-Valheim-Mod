@@ -7,6 +7,32 @@ using TMPro;
 
 namespace SimpleBackup
 {
+    public sealed class BackupButtonStateController : MonoBehaviour
+    {
+        private Button _button;
+
+        public void Initialize(Button button)
+        {
+            _button = button;
+            RefreshState();
+        }
+
+        private void Update()
+        {
+            RefreshState();
+        }
+
+        private void RefreshState()
+        {
+            if (_button == null)
+            {
+                return;
+            }
+
+            _button.interactable = !BackupCoordinator.IsBackupInProgress && !BackupCoordinator.IsCooldownActive;
+        }
+    }
+
     [HarmonyPatch(typeof(Menu))]
     public static class MenuPatch
     {
@@ -85,6 +111,9 @@ namespace SimpleBackup
                         {
                             btn.navigation = templateButton.navigation;
                         }
+
+                        BackupButtonStateController stateController = backupButtonObj.AddComponent<BackupButtonStateController>();
+                        stateController.Initialize(btn);
                     }
                 }
             }
