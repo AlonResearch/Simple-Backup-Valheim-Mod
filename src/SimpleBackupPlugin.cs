@@ -65,12 +65,6 @@ namespace SimpleBackup
                 {
                     MessageHud.instance.ShowMessage(MessageHud.MessageType.TopLeft, message);
                 }
-                
-                // If console is open, also safely print it there
-                if (Console.instance != null)
-                {
-                    Console.instance.Print(message);
-                }
             }
 
             if (BackupIntervalMinutes.Value > 0)
@@ -92,17 +86,17 @@ namespace SimpleBackup
                     BackupCoordinator.BackupStartResult startResult = BackupCoordinator.TryStartBackup(worldName, charName);
                     if (startResult == BackupCoordinator.BackupStartResult.Started)
                     {
-                        Logger.LogInfo($"Performing scheduled automatic backup for World: {worldName} | Char: {charName}...");
+                        Logger.LogDebug($"Scheduled backup started for world='{worldName}', character='{charName}'.");
                     }
                     else
                     {
                         if (startResult == BackupCoordinator.BackupStartResult.CooldownActive)
                         {
-                            Logger.LogWarning("Skipped scheduled backup because the 2-second backup cooldown is active.");
+                            Logger.LogDebug("Skipped scheduled backup due to cooldown.");
                         }
                         else
                         {
-                            Logger.LogWarning("Skipped scheduled backup because another backup is already running.");
+                            Logger.LogDebug("Skipped scheduled backup because another backup is running.");
                         }
                     }
                 }
