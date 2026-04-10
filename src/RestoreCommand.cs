@@ -3,6 +3,7 @@ using System.IO;
 using System.IO.Compression;
 using System.Linq;
 using HarmonyLib;
+using System.Collections.Generic;
 
 namespace SimpleBackup
 {
@@ -66,37 +67,74 @@ namespace SimpleBackup
         private static void HandleBackupCommand(Terminal context, string[] args)
         {
             string option = args.Length >= 2 ? args[1].ToLower() : "both";
-            
-            if (option == "char" || option == "both")
+
+            string cName = Player.m_localPlayer != null ? Player.m_localPlayer.GetPlayerName() : null;
+            string wName = (ZNet.instance != null && ZNet.instance.IsServer()) ? ZNet.instance.GetWorldName() : null;
+
+            if (option == "char")
             {
-                string cName = Player.m_localPlayer != null ? Player.m_localPlayer.GetPlayerName() : null;
-                if (!string.IsNullOrEmpty(cName))
-                {
-                    context.AddString($"Starting background backup for character: {cName}...");
-                    System.Threading.Tasks.Task.Run(() => BackupManager.PerformFullBackup(null, cName));
-                }
-                else if (option == "char")
+                if (string.IsNullOrEmpty(cName))
                 {
                     context.AddString("ERROR: No active character found.");
+                    return;
                 }
+
+                StartBackupFromConsole(context, null, cName, $"Starting background backup for character: {cName}...");
+                return;
             }
 
-            if (option == "world" || option == "both")
+            if (option == "world")
             {
-                if (ZNet.instance != null && ZNet.instance.IsServer())
-                {
-                    string wName = ZNet.instance.GetWorldName();
-                    if (!string.IsNullOrEmpty(wName))
-                    {
-                        context.AddString($"Starting background backup for world: {wName}...");
-                        System.Threading.Tasks.Task.Run(() => BackupManager.PerformFullBackup(wName, null));
-                    }
-                }
-                else if (option == "world")
+                if (string.IsNullOrEmpty(wName))
                 {
                     context.AddString("ERROR: You can only backup a world if you are actively hosting it locally.");
+                    return;
                 }
+
+                StartBackupFromConsole(context, wName, null, $"Starting background backup for world: {wName}...");
+                return;
             }
+
+            if (string.IsNullOrEmpty(cName) && string.IsNullOrEmpty(wName))
+            {
+                context.AddString("ERROR: No active world or character found.");
+                return;
+            }
+
+            string targetLabel = DescribeTarget(wName, cName);
+            StartBackupFromConsole(context, wName, cName, $"Starting background backup for {targetLabel}...");
+        }
+
+        private static void StartBackupFromConsole(Terminal context, string worldName, string characterName, string startMessage)
+        {
+            if (BackupCoordinator.TryStartBackup(worldName, characterName))
+            {
+                context.AddString(startMessage);
+            }
+            else
+            {
+                context.AddString("A backup is already running. Please wait for it to finish.");
+            }
+        }
+
+        private static string DescribeTarget(string worldName, string characterName)
+        {
+            if (!string.IsNullOrEmpty(worldName) && !string.IsNullOrEmpty(characterName))
+            {
+                return $"world: {worldName} and character: {characterName}";
+            }
+
+            if (!string.IsNullOrEmpty(worldName))
+            {
+                return $"world: {worldName}";
+            }
+
+            if (!string.IsNullOrEmpty(characterName))
+            {
+                return $"character: {characterName}";
+            }
+
+            return "the current save targets";
         }
 
         private static void HandleListCommand(Terminal context)
@@ -126,31 +164,30 @@ namespace SimpleBackup
                 return;
             }
 
-            string saveName = args[1];
-            RestoreLatestBackup(saveName, context);
+            TryRestoreLatestBackup(args[1], context != null ? new Action<string>(context.AddString) : null);
         }
 
-        private static void RestoreLatestBackup(string saveName, Terminal context)
+        public static bool TryRestoreLatestBackup(string saveName, Action<string> reportMessage)
         {
             if (ZNet.instance != null || Player.m_localPlayer != null)
             {
-                context.AddString("ERROR: Restoring while actively loaded into a world is extremely dangerous and can corrupt your game! Please return to the Main Menu to restore.");
-                return;
+                Emit(reportMessage, "ERROR: Restoring while actively loaded into a world is extremely dangerous and can corrupt your game! Please return to the Main Menu to restore.");
+                return false;
             }
 
             var backups = BackupManager.GetAllAvailableBackups();
-            var targetBackups = backups.Where(b => Path.GetFileName(b).Contains(saveName))
+            var targetBackups = backups.Where(b => string.Equals(BackupManager.GetTargetNameFromBackupFile(b), saveName, StringComparison.OrdinalIgnoreCase))
                                        .OrderByDescending(b => File.GetCreationTime(b))
                                        .ToList();
 
             if (targetBackups.Count == 0)
             {
-                context.AddString($"No backups found for target: {saveName}");
-                return;
+                Emit(reportMessage, $"No backups found for target: {saveName}");
+                return false;
             }
 
             string latestZip = targetBackups.First();
-            context.AddString($"Found latest backup: {Path.GetFileName(latestZip)}");
+            Emit(reportMessage, $"Found latest backup: {Path.GetFileName(latestZip)}");
 
             try
             {
@@ -161,11 +198,11 @@ namespace SimpleBackup
                 string originalSaveDir = FindOriginalSaveDirectory(saveName);
                 if (string.IsNullOrEmpty(originalSaveDir))
                 {
-                    context.AddString("Could not locate original save file location in Steam/Local. You may need to manually extract this zip from: \n" + latestZip);
-                    return;
+                    Emit(reportMessage, "Could not locate original save file location in Steam/Local. You may need to manually extract this zip from: \n" + latestZip);
+                    return false;
                 }
 
-                context.AddString($"Original location found: {originalSaveDir}");
+                Emit(reportMessage, $"Original location found: {originalSaveDir}");
                 
                 // Backup current files to .old
                 var activeFiles = Directory.GetFiles(originalSaveDir).Where(f => Path.GetFileNameWithoutExtension(f) == saveName && !f.EndsWith(".old") && !f.EndsWith(".zip")).ToList();
@@ -174,7 +211,7 @@ namespace SimpleBackup
                     string oldPath = activeFile + ".old";
                     if (File.Exists(oldPath)) File.Delete(oldPath);
                     File.Move(activeFile, oldPath);
-                    context.AddString($"Renamed current active save to {Path.GetFileName(oldPath)}");
+                    Emit(reportMessage, $"Renamed current active save to {Path.GetFileName(oldPath)}");
                 }
 
                 // Extract Zip
@@ -184,16 +221,40 @@ namespace SimpleBackup
                     {
                         string extractPath = Path.Combine(originalSaveDir, entry.FullName);
                         entry.ExtractToFile(extractPath, overwrite: true);
-                        context.AddString($"Extracted: {entry.FullName}");
+                        Emit(reportMessage, $"Extracted: {entry.FullName}");
                     }
                 }
 
-                context.AddString("Restore complete! Please restart your game session or reload from Main Menu if necessary.");
+                Emit(reportMessage, "Restore complete! Please restart your game session or reload from Main Menu if necessary.");
+                return true;
             }
             catch (Exception ex)
             {
-                context.AddString($"Error during restore: {ex.Message}");
+                Emit(reportMessage, $"Error during restore: {ex.Message}");
                 SimpleBackupPlugin.Log.LogError(ex);
+                return false;
+            }
+        }
+
+        public static bool TryRestoreLatestBackup(string saveName, Terminal context)
+        {
+            return TryRestoreLatestBackup(saveName, context != null ? new Action<string>(context.AddString) : null);
+        }
+
+        public static List<BackupManager.BackupTargetInfo> GetAvailableRestoreTargets()
+        {
+            return BackupManager.GetLatestBackupTargets();
+        }
+
+        private static void Emit(Action<string> reportMessage, string message)
+        {
+            if (reportMessage != null)
+            {
+                reportMessage(message);
+            }
+            else
+            {
+                SimpleBackupPlugin.Log.LogInfo(message);
             }
         }
 
