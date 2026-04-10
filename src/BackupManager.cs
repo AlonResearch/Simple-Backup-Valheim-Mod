@@ -419,6 +419,7 @@ namespace SimpleBackup
                 if (created)
                 {
                     SimpleBackupPlugin.Log.LogDebug($"Native backup created for {DescribeNativeTarget(saveDataType == SaveDataType.World ? BackupSaveType.World : BackupSaveType.Character, saveName)}");
+                    PruneNativeBackupsForTarget(primary);
                 }
                 else
                 {
@@ -442,6 +443,74 @@ namespace SimpleBackup
             }
 
             return saveType == BackupSaveType.World ? $"world '{saveName}'" : $"character '{saveName}'";
+        }
+
+        private static void PruneNativeBackupsForTarget(SaveFile primaryFile)
+        {
+            try
+            {
+                int maxBackupsPerSave = SimpleBackupPlugin.MaxBackupsPerSave != null ? SimpleBackupPlugin.MaxBackupsPerSave.Value : 0;
+                if (maxBackupsPerSave <= 0 || primaryFile == null)
+                {
+                    return;
+                }
+
+                string primaryPath = primaryFile.PathPrimary;
+                if (string.IsNullOrEmpty(primaryPath))
+                {
+                    return;
+                }
+
+                string targetDirectory = Path.GetDirectoryName(primaryPath);
+                if (string.IsNullOrEmpty(targetDirectory))
+                {
+                    return;
+                }
+
+                string backupDirectory = Path.Combine(targetDirectory, "backups");
+                if (!Directory.Exists(backupDirectory))
+                {
+                    return;
+                }
+
+                string filePrefix = primaryFile.FileName;
+                if (string.IsNullOrEmpty(filePrefix))
+                {
+                    filePrefix = Path.GetFileName(primaryPath);
+                }
+
+                if (string.IsNullOrEmpty(filePrefix))
+                {
+                    return;
+                }
+
+                List<FileInfo> backups = Directory.GetFiles(backupDirectory, filePrefix + "*")
+                    .Select(path => new FileInfo(path))
+                    .OrderByDescending(file => file.CreationTimeUtc)
+                    .ToList();
+
+                if (backups.Count <= maxBackupsPerSave)
+                {
+                    return;
+                }
+
+                for (int index = maxBackupsPerSave; index < backups.Count; index++)
+                {
+                    try
+                    {
+                        backups[index].Delete();
+                        SimpleBackupPlugin.Log.LogDebug($"Pruned native backup: {backups[index].Name}");
+                    }
+                    catch (Exception ex)
+                    {
+                        SimpleBackupPlugin.Log.LogWarning($"Failed to prune native backup {backups[index].Name}: {ex.Message}");
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                SimpleBackupPlugin.Log.LogWarning($"Native backup pruning failed: {ex.Message}");
+            }
         }
 
         private static bool InvokeMoveToBackup(SaveFile saveFile, DateTime now)

@@ -87,7 +87,7 @@ namespace SimpleBackup
         public static ManualLogSource Log;
 
         public static ConfigEntry<int> BackupIntervalMinutes;
-        public static ConfigEntry<int> MaxBackupsToKeep;
+        public static ConfigEntry<int> MaxBackupsPerSave;
 
         private float _timeSinceLastBackup = 0f;
 
@@ -97,7 +97,7 @@ namespace SimpleBackup
             Log = Logger;
 
             BackupIntervalMinutes = Config.Bind("General", "BackupIntervalMinutes", 0, "Time in minutes between automatic backups. Set to 0 to disable automatic backups.");
-            MaxBackupsToKeep = Config.Bind("General", "MaxBackupsToKeep", 5, "Maximum number of backups to keep per world or character.");
+            MaxBackupsPerSave = Config.Bind("General", "MaxBackupsPerSave", 5, "Maximum number of native backups to keep per save.");
 
             _harmony = new Harmony(PluginGUID);
             _harmony.PatchAll(Assembly.GetExecutingAssembly());
