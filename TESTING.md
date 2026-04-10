@@ -1,155 +1,189 @@
-# TESTING GUIDE: SimpleBackup 0.0.3
+# TESTING GUIDE: SimpleBackup (Current Ground Truth)
 
-This guide is for the current native-backup transition build.
+This test plan validates all currently implemented backup features, including save-sync reliability, strict target behavior, indicator UX, and backup duration toasts.
 
-## 1. Scope Of This Version
+## 1. Prerequisites
 
-The in-game behavior to validate in 0.0.3:
-
-1. Esc menu `Backup` button works.
-2. `sb.backup` command family works.
-3. Backups are created through Valheim native backup flow.
-4. Backups appear in Valheim native Manage Saves data.
-5. No custom SimpleBackup restore panel is present.
-
-## 2. Prerequisites
-
-1. Valheim installed and launches normally.
+1. Valheim installed and launchable.
 2. BepInEx 5 installed.
-3. `SimpleBackup.dll` from this build in `BepInEx/plugins`.
+3. Latest `SimpleBackup.dll` in BepInEx plugins.
 4. At least one character exists.
-5. For world tests, at least one local hosted world exists.
+5. At least one local world exists for host tests.
 
-## 3. Build Verification
+## 2. Build Verification
 
-1. Build `SimpleBackup.sln` in Release.
-2. Confirm `src/bin/Release/net462/SimpleBackup.dll` is produced.
-3. Launch game once and verify plugin load line in log.
+1. Run `dotnet build SimpleBackup.sln -c Release`.
+2. Confirm output file exists at `src/bin/Release/net462/SimpleBackup.dll`.
 
-Expected result:
+Expected:
 
-1. Build succeeds with no compile errors.
-2. Plugin loads as version `0.0.3`.
+1. Build succeeds without errors.
 
-## 4. Smoke Test In Main Menu
+## 3. Startup And Injection Check
 
-1. Open Valheim and stop at main menu.
-2. Open `Manage saves` for characters and worlds.
-3. Confirm there is no custom backup overlay panel from the old implementation.
+1. Launch game and enter a world.
+2. Press `Esc` and verify `Backup` button exists under `Save`.
 
-Expected result:
+Expected:
 
-1. Only vanilla Manage Saves UI is shown.
+1. Backup button is present.
+2. No Harmony patch exceptions for menu injection.
 
-## 5. In-World Esc Button Test
+## 4. Backup Indicator UX Check
 
-1. Enter a hosted local world.
-2. Press `Esc`.
-3. Verify `Backup` button exists under `Save`.
-4. Click `Backup` once.
-5. Observe top-left status text.
+1. Trigger backup once (Esc button or `sb.backup`).
+2. Watch top-right while backup is running.
+3. Wait for completion.
 
-Expected result:
+Expected:
 
-1. Backup starts and completes.
-2. Message includes target identity, such as world and/or character name.
-3. No UI freeze or major frame hitch.
+1. Flashing backup badge appears at top-right during backup.
+2. Badge disappears when backup finishes/fails/cancels.
+3. No center-screen backup spam appears.
 
-## 6. Concurrency And Cooldown Test
+## 5. Duration Toast Check
 
-1. Trigger backup with Esc button.
-2. Immediately trigger again within cooldown window.
-3. Repeat with console command.
+1. Trigger backup and observe completion toast.
+2. Trigger at least one forced failure scenario (invalid explicit target, if reproducible).
 
-Expected result:
+Expected:
 
-1. Second trigger is blocked with cooldown or running message.
-2. No overlapping backup jobs start.
+1. Success toast format includes elapsed seconds, for example `Backup complete (1.8s): ...`.
+2. Failure/cancel toasts also include elapsed seconds.
 
-## 7. Console Command Test
+## 6. Save-Sync Freshness (Core Persistence Test)
 
-Open console with `F5` and validate these commands:
+Character freshness:
+
+1. Enter world with character A.
+2. Make a visible state change that should persist (inventory/equipment/stat change).
+3. Do not press vanilla Save.
+4. Run `sb.backup char` immediately.
+5. Restore from native Manage Saves and load again.
+
+Expected:
+
+1. Restored character includes the latest change.
+2. If save-sync cannot be confirmed, backup is canceled (not silently stale).
+
+World freshness:
+
+1. Host local world B.
+2. Make a visible world change (place/remove structure).
+3. Do not press vanilla Save.
+4. Run `sb.backup world` immediately.
+5. Restore via native UI and load world.
+
+Expected:
+
+1. Restored world includes latest change.
+2. No stale snapshot from pre-change state.
+
+## 7. Command Pipeline Validation
+
+Run in console (`F5`):
 
 1. `sb.backup`
 2. `sb.backup char`
-3. `sb.backup world` while hosting
-4. `sb.backup world` while not hosting
-5. `sb.list`
+3. `sb.backup world`
+4. `sb.list`
 
-Expected result:
+Expected:
 
-1. `sb.backup` creates native backup for current available targets.
-2. `sb.backup char` creates character backup only.
-3. `sb.backup world` creates world backup when hosting.
-4. Non-host `sb.backup world` prints an error.
-5. `sb.list` prints legacy archive index output only (not the native save list).
+1. `sb.backup` targets available saves for current session context.
+2. `sb.backup char` targets character only.
+3. `sb.backup world` targets world only when host.
+4. `sb.list` lists legacy archive index entries.
 
-## 8. Native Manage Saves Integration Check
+## 8. Strict Target Intent Validation
 
-After running backups from button/commands:
+1. Run `sb.backup char` in hosted world session.
+2. Create a condition where char backup cannot be resolved (if reproducible).
+3. Observe result.
+4. Run `sb.backup world` with world unavailable (non-host/client).
 
-1. Return to main menu.
-2. Open `Manage saves`.
-3. Check the relevant target rows in `Worlds` and `Characters` tabs.
-4. Expand the row and inspect backup entries/count and timestamps.
+Expected:
 
-Expected result:
+1. Explicit commands do not fall back to the other target type.
+2. Failure message is explicit for requested target.
 
-1. Newly created backups appear as native backup entries.
-2. Entries are grouped in the correct target category.
-3. Naming and restore options follow Valheim native style.
+## 9. Cooldown And Single-Flight
 
-## 9. Native Restore Validation
+1. Trigger backup.
+2. Trigger backup again immediately.
+3. Trigger a third while previous is still running (if timing allows).
 
-Use only vanilla UI restore:
+Expected:
 
-1. In `Manage saves`, pick one target with at least one new backup.
-2. Use vanilla restore action from that backup entry.
-3. Load into game with restored character/world.
+1. `Backup on cooldown.` or `Backup already running.` appears.
+2. No overlapping backup jobs start.
 
-Expected result:
+## 10. Scene Gating
 
-1. Restore completes via native flow.
-2. Save identity remains correct (no unexpected character rename/reset).
-3. Character does not behave like first-time intro unless expected by selected backup state.
+1. From a scene where save backend is unavailable, attempt backup trigger.
 
-## 10. Target Correctness Matrix
+Expected:
 
-Run and record this matrix:
+1. Toast indicates backup unavailable in current scene.
+2. No crash or unhandled exception.
 
-1. Hosted local world + `sb.backup world` -> world only.
-2. Hosted local world + `sb.backup char` -> character only.
-3. Hosted local world + Esc button -> world + character.
-4. Client session + Esc button -> character only.
-5. Client session + `sb.backup world` -> blocked with error.
+## 11. Native Manage Saves Visibility
 
-Expected result:
+1. After successful backup runs, return to main menu.
+2. Open native Manage Saves for Characters and Worlds.
+3. Verify new entries and timestamps.
 
-1. Each command/button affects only intended target type(s).
+Expected:
 
-## 11. Stability Checklist
+1. Backup entries appear under correct native target category.
 
-1. No Harmony exceptions in Player.log related to Menu or save systems.
-2. No unhandled exceptions during backup triggers.
-3. Repeated backup cycles remain stable.
+## 12. Scheduled Backup Path
 
-## 12. What To Report If A Test Fails
+1. Set `BackupIntervalMinutes=1` in config.
+2. Enter world and wait for interval.
+3. Observe indicator and completion toast.
 
-Provide this exact info:
+Expected:
 
-1. Test section number and step.
+1. Scheduled backup follows same pipeline.
+2. Indicator and duration toast behavior matches manual triggers.
+
+## 13. Log Quality Validation
+
+1. Check BepInEx log during successful and failed runs.
+
+Expected:
+
+1. Routine flow remains mostly debug/info level.
+2. Warnings/errors appear only for actionable problems (sync unavailable, target unavailable, etc.).
+3. No noisy repetitive spam each frame.
+
+## 14. Regression Checklist
+
+1. Esc menu remains usable and responsive.
+2. No game freeze during backup operations.
+3. No corrupted save identity after restore.
+4. No command registration regressions (`sb.backup` present after loading).
+
+## 15. Failure Report Template
+
+Include all items below for failed scenarios:
+
+1. Test section number and failing step.
 2. Host/client state.
-3. Target names used.
-4. Console output and on-screen messages.
-5. Player.log excerpt around failure.
-6. Screenshot of Manage Saves before/after action.
+3. Trigger used (Esc, `sb.backup`, `sb.backup world`, `sb.backup char`, timer).
+4. On-screen toast text.
+5. Console output.
+6. Relevant BepInEx/Player.log excerpt.
+7. Manage Saves screenshots before/after.
 
-## 13. Quick Pass Criteria
+## 16. Pass Criteria
 
-This version passes if all are true:
+Build passes when all are true:
 
-1. Backup button works in Esc menu.
-2. `sb.backup` commands run with correct target scope.
-3. Native backup entries appear in vanilla Manage Saves.
-4. Native restore works from vanilla UI without identity corruption.
-5. No custom restore panel is required for backup/restore workflow.
+1. Backup button and command flows work in expected contexts.
+2. Save-sync freshness test passes for both character and world.
+3. Explicit target commands remain strict without cross-target fallback.
+4. Top-right backup indicator and duration toasts behave correctly.
+5. Native Manage Saves entries appear for successful backups.
+6. No unhandled exceptions or severe runtime regressions.
