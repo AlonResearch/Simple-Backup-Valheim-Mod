@@ -171,14 +171,26 @@ Expected:
 2. Backup should not hard-fail repeatedly only because SaveSystem trigger is missing.
 3. If both trigger paths are unavailable, backup proceeds best-effort and logs a warning.
 
-## 15. Regression Checklist
+## 15. Native Retention Validation
+
+1. Set `MaxBackupsPerSave=5`.
+2. Trigger more than five successful backups for the same save target.
+3. Inspect the native `backups` folder in Valheim save storage.
+
+Expected:
+
+1. Only the newest five backup entries remain for that save.
+2. Older entries are pruned after each successful backup.
+3. Pruning does not affect backups for other saves.
+
+## 16. Regression Checklist
 
 1. Esc menu remains usable and responsive.
 2. No game freeze during backup operations.
 3. No corrupted save identity after restore.
 4. No command registration regressions (`sb.backup` present after loading).
 
-## 16. Failure Report Template
+## 17. Failure Report Template
 
 Include all items below for failed scenarios:
 
@@ -190,7 +202,7 @@ Include all items below for failed scenarios:
 6. Relevant BepInEx/Player.log excerpt.
 7. Manage Saves screenshots before/after.
 
-## 17. Pass Criteria
+## 18. Pass Criteria
 
 Build passes when all are true:
 

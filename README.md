@@ -72,7 +72,12 @@ Examples:
 Config file: `com.aloncifer.simplebackup.cfg`
 
 1. `BackupIntervalMinutes`: timed backup interval. `0` disables scheduler.
-2. `MaxBackupsToKeep`: retained for legacy archive-index path compatibility.
+2. `MaxBackupsPerSave`: maximum number of native backups kept per save target.
+
+Retention behavior:
+
+1. Native backups are pruned after each successful backup so only the newest `MaxBackupsPerSave` entries remain per save.
+2. Setting the value to `0` disables pruning.
 
 ## Build and Install
 
