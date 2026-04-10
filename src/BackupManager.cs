@@ -66,14 +66,18 @@ namespace SimpleBackup
 
             if (!string.IsNullOrEmpty(targetWorld))
             {
-                backupItems.Add(DescribeNativeTarget(BackupSaveType.World, targetWorld));
-                TryCreateNativeBackup(targetWorld, SaveDataType.World);
+                if (TryCreateNativeBackup(targetWorld, SaveDataType.World))
+                {
+                    backupItems.Add(DescribeNativeTarget(BackupSaveType.World, targetWorld));
+                }
             }
 
             if (!string.IsNullOrEmpty(targetCharacter))
             {
-                backupItems.Add(DescribeNativeTarget(BackupSaveType.Character, targetCharacter));
-                TryCreateNativeBackup(targetCharacter, SaveDataType.Character);
+                if (TryCreateNativeBackup(targetCharacter, SaveDataType.Character))
+                {
+                    backupItems.Add(DescribeNativeTarget(BackupSaveType.Character, targetCharacter));
+                }
             }
 
             if (backupItems.Count == 0)
@@ -83,18 +87,19 @@ namespace SimpleBackup
                     string worldName = ZNet.instance.GetWorldName();
                     if (!string.IsNullOrEmpty(worldName))
                     {
-                        backupItems.Add(DescribeNativeTarget(BackupSaveType.World, worldName));
-                        TryCreateNativeBackup(worldName, SaveDataType.World);
+                        if (TryCreateNativeBackup(worldName, SaveDataType.World))
+                        {
+                            backupItems.Add(DescribeNativeTarget(BackupSaveType.World, worldName));
+                        }
                     }
                 }
 
-                if (Player.m_localPlayer != null)
+                string characterName = GetCurrentCharacterSaveName();
+                if (!string.IsNullOrEmpty(characterName))
                 {
-                    string characterName = Player.m_localPlayer.GetPlayerName();
-                    if (!string.IsNullOrEmpty(characterName))
+                    if (TryCreateNativeBackup(characterName, SaveDataType.Character))
                     {
                         backupItems.Add(DescribeNativeTarget(BackupSaveType.Character, characterName));
-                        TryCreateNativeBackup(characterName, SaveDataType.Character);
                     }
                 }
             }
@@ -118,10 +123,28 @@ namespace SimpleBackup
         {
             try
             {
-                bool created = ZNet.ConsiderAutoBackup(saveName, saveDataType, DateTime.Now);
+                SaveWithBackups save;
+                if (!SaveSystem.TryGetSaveByName(saveName, saveDataType, out save) || save == null)
+                {
+                    SimpleBackupPlugin.Log.LogWarning($"Native backup skipped because save '{saveName}' was not found for type {saveDataType}.");
+                    return false;
+                }
+
+                SaveFile primary = save.PrimaryFile;
+                if (primary == null)
+                {
+                    SimpleBackupPlugin.Log.LogWarning($"Native backup skipped because no primary file exists for '{saveName}'.");
+                    return false;
+                }
+
+                bool created = InvokeMoveToBackup(primary, DateTime.Now);
                 if (created)
                 {
                     SimpleBackupPlugin.Log.LogInfo($"Native backup created for {DescribeNativeTarget(saveDataType == SaveDataType.World ? BackupSaveType.World : BackupSaveType.Character, saveName)}");
+                }
+                else
+                {
+                    SimpleBackupPlugin.Log.LogWarning($"Native backup call did not create a backup entry for {DescribeNativeTarget(saveDataType == SaveDataType.World ? BackupSaveType.World : BackupSaveType.Character, saveName)}.");
                 }
 
                 return created;
@@ -141,6 +164,57 @@ namespace SimpleBackup
             }
 
             return saveType == BackupSaveType.World ? $"world '{saveName}'" : $"character '{saveName}'";
+        }
+
+        private static bool InvokeMoveToBackup(SaveFile saveFile, DateTime now)
+        {
+            try
+            {
+                var method = typeof(SaveSystem).GetMethod("MoveToBackup", System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic);
+                if (method == null)
+                {
+                    SimpleBackupPlugin.Log.LogWarning("Could not find native SaveSystem.MoveToBackup method.");
+                    return false;
+                }
+
+                object result = method.Invoke(null, new object[] { saveFile, now });
+                return result is bool && (bool)result;
+            }
+            catch (Exception ex)
+            {
+                SimpleBackupPlugin.Log.LogError($"Reflection call to MoveToBackup failed: {ex.Message}");
+                return false;
+            }
+        }
+
+        public static string GetCurrentCharacterSaveName()
+        {
+            try
+            {
+                if (Game.instance != null)
+                {
+                    PlayerProfile profile = Game.instance.GetPlayerProfile();
+                    if (profile != null)
+                    {
+                        string filename = profile.GetFilename();
+                        if (!string.IsNullOrEmpty(filename))
+                        {
+                            return filename;
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                SimpleBackupPlugin.Log.LogWarning($"Failed to resolve canonical character save name: {ex.Message}");
+            }
+
+            if (Player.m_localPlayer != null)
+            {
+                return Player.m_localPlayer.GetPlayerName();
+            }
+
+            return null;
         }
 
         public static List<string> GetValheimSaveDirectories()

@@ -64,7 +64,7 @@ namespace SimpleBackup
                         btn.onClick.AddListener(() =>
                         {
                             string wName = (ZNet.instance != null && ZNet.instance.IsServer()) ? ZNet.instance.GetWorldName() : null;
-                            string cName = Player.m_localPlayer != null ? Player.m_localPlayer.GetPlayerName() : null;
+                            string cName = BackupManager.GetCurrentCharacterSaveName();
 
                             BackupCoordinator.BackupStartResult startResult = BackupCoordinator.TryStartBackup(wName, cName);
                             if (startResult == BackupCoordinator.BackupStartResult.Started)

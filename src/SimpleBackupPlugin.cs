@@ -13,7 +13,7 @@ namespace SimpleBackup
     {
         public const string PluginGUID = "com.aloncifer.simplebackup";
         public const string PluginName = "SimpleBackup";
-        public const string PluginVersion = "0.0.2";
+        public const string PluginVersion = "0.0.3";
 
         private Harmony _harmony;
         public static SimpleBackupPlugin Instance;
@@ -87,7 +87,7 @@ namespace SimpleBackup
                     
                     // Only backup world automatically if the user is the host
                     string worldName = (ZNet.instance != null && ZNet.instance.IsServer()) ? ZNet.instance.GetWorldName() : null;
-                    string charName = Player.m_localPlayer != null ? Player.m_localPlayer.GetPlayerName() : null;
+                    string charName = BackupManager.GetCurrentCharacterSaveName();
 
                     BackupCoordinator.BackupStartResult startResult = BackupCoordinator.TryStartBackup(worldName, charName);
                     if (startResult == BackupCoordinator.BackupStartResult.Started)
