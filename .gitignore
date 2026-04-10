@@ -10,3 +10,6 @@ releases/
 
 # Artifacts & zip
 *.zip
+
+# Local tooling artifacts
+.claw/
