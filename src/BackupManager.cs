@@ -5,11 +5,19 @@ using System.IO.Compression;
 using System.Linq;
 using Microsoft.Win32;
 using UnityEngine;
+using System.Text.RegularExpressions;
 
 namespace SimpleBackup
 {
     public static class BackupManager
     {
+        public struct BackupTargetInfo
+        {
+            public string TargetName;
+            public string LatestBackupPath;
+            public DateTime CreatedAt;
+        }
+
         public static string GetBackupRootDirectory()
         {
             string localLow = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData) + "Low";
@@ -199,6 +207,62 @@ namespace SimpleBackup
                 backups.AddRange(Directory.GetFiles(categoryDir, "*.zip"));
             }
             return backups;
+        }
+
+        public static List<BackupTargetInfo> GetLatestBackupTargets()
+        {
+            var latestByTarget = new Dictionary<string, BackupTargetInfo>(StringComparer.OrdinalIgnoreCase);
+
+            foreach (string backupPath in GetAllAvailableBackups())
+            {
+                string targetName = GetTargetNameFromBackupFile(backupPath);
+                if (string.IsNullOrEmpty(targetName))
+                {
+                    continue;
+                }
+
+                DateTime createdAt = File.GetCreationTime(backupPath);
+                BackupTargetInfo current;
+                if (!latestByTarget.TryGetValue(targetName, out current) || createdAt > current.CreatedAt)
+                {
+                    latestByTarget[targetName] = new BackupTargetInfo
+                    {
+                        TargetName = targetName,
+                        LatestBackupPath = backupPath,
+                        CreatedAt = createdAt
+                    };
+                }
+            }
+
+            return latestByTarget.Values.OrderByDescending(entry => entry.CreatedAt).ToList();
+        }
+
+        public static string GetTargetNameFromBackupFile(string backupPath)
+        {
+            if (string.IsNullOrEmpty(backupPath))
+            {
+                return null;
+            }
+
+            string fileName = Path.GetFileNameWithoutExtension(backupPath);
+            if (string.IsNullOrEmpty(fileName))
+            {
+                return null;
+            }
+
+            Match match = Regex.Match(fileName, @"^\d{8}_\d{6}-(.+)$");
+            if (match.Success)
+            {
+                return match.Groups[1].Value.Trim();
+            }
+
+            int firstDash = fileName.IndexOf('-');
+            if (firstDash >= 0 && firstDash < fileName.Length - 1)
+            {
+                return fileName.Substring(firstDash + 1).Trim();
+            }
+
+            return fileName.Trim();
         }
     }
 }
