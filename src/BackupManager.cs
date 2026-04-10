@@ -23,6 +23,8 @@ namespace SimpleBackup
         private static bool _saveSyncInitialized;
         private static MethodInfo _nativeSaveTriggerMethod;
         private static object[] _nativeSaveTriggerArgs = Array.Empty<object>();
+        private static MethodInfo _znetSaveTriggerMethod;
+        private static object[] _znetSaveTriggerArgs = Array.Empty<object>();
         private static MethodInfo _nativeSaveInProgressMethod;
 
         public enum BackupSaveType
@@ -160,8 +162,29 @@ namespace SimpleBackup
 
                 if (_nativeSaveTriggerMethod == null)
                 {
-                    SimpleBackupPlugin.Log.LogWarning("No compatible native save trigger method was found on SaveSystem.");
-                    return false;
+                    if (_znetSaveTriggerMethod == null)
+                    {
+                        SimpleBackupPlugin.Log.LogWarning("No compatible native save trigger method was found; proceeding with best-effort backup.");
+                        Thread.Sleep(SaveSettleDelayWithoutStatusMs);
+                        return true;
+                    }
+
+                    bool invokedOnMainThread = SimpleBackupPlugin.TryInvokeOnMainThread(() =>
+                    {
+                        object target = _znetSaveTriggerMethod.IsStatic ? null : ZNet.instance;
+                        _znetSaveTriggerMethod.Invoke(target, _znetSaveTriggerArgs);
+                    }, timeoutMs: 3000);
+
+                    if (!invokedOnMainThread)
+                    {
+                        SimpleBackupPlugin.Log.LogWarning($"Failed to invoke ZNet save trigger {_znetSaveTriggerMethod.Name}; proceeding with best-effort backup.");
+                        Thread.Sleep(SaveSettleDelayWithoutStatusMs);
+                        return true;
+                    }
+
+                    SimpleBackupPlugin.Log.LogDebug($"Triggered native save via ZNet.{_znetSaveTriggerMethod.Name}().");
+                    Thread.Sleep(SaveSettleDelayWithoutStatusMs);
+                    return true;
                 }
 
                 _nativeSaveTriggerMethod.Invoke(null, _nativeSaveTriggerArgs);
@@ -251,15 +274,17 @@ namespace SimpleBackup
 
                 BindingFlags flags = BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic;
                 MethodInfo[] methods = typeof(SaveSystem).GetMethods(flags);
+                MethodInfo[] znetMethods = typeof(ZNet).GetMethods(flags);
 
                 TryResolveSaveTriggerMethod(methods, out _nativeSaveTriggerMethod, out _nativeSaveTriggerArgs);
+                TryResolveZNetSaveTriggerMethod(znetMethods, out _znetSaveTriggerMethod, out _znetSaveTriggerArgs);
 
                 _nativeSaveInProgressMethod =
                     FindMethod(methods, "IsSaving", "IsInProgress", "SaveInProgress", "IsBusy") ??
                     FindBoolNoArgMethodContaining(methods, "progress", "saving", "busy");
 
                 SimpleBackupPlugin.Log.LogDebug(
-                    $"Native save sync support: trigger={(_nativeSaveTriggerMethod != null ? _nativeSaveTriggerMethod.Name : "none")}, status={(_nativeSaveInProgressMethod != null ? _nativeSaveInProgressMethod.Name : "none")}");
+                    $"Native save sync support: saveSystemTrigger={(_nativeSaveTriggerMethod != null ? _nativeSaveTriggerMethod.Name : "none")}, znetTrigger={(_znetSaveTriggerMethod != null ? _znetSaveTriggerMethod.Name : "none")}, status={(_nativeSaveInProgressMethod != null ? _nativeSaveInProgressMethod.Name : "none")}");
 
                 _saveSyncInitialized = true;
             }
@@ -316,6 +341,47 @@ namespace SimpleBackup
                     triggerArgs = new object[] { true };
                     return true;
                 }
+            }
+
+            triggerMethod = null;
+            triggerArgs = Array.Empty<object>();
+            return false;
+        }
+
+        private static bool TryResolveZNetSaveTriggerMethod(MethodInfo[] methods, out MethodInfo triggerMethod, out object[] triggerArgs)
+        {
+            MethodInfo saveNoArg = FindMethod(methods, "SaveWorldAndPlayerProfiles");
+            if (saveNoArg != null)
+            {
+                triggerMethod = saveNoArg;
+                triggerArgs = Array.Empty<object>();
+                return true;
+            }
+
+            MethodInfo saveThreeBool = methods.FirstOrDefault(m =>
+                string.Equals(m.Name, "Save", StringComparison.OrdinalIgnoreCase) &&
+                m.GetParameters().Length == 3 &&
+                m.GetParameters().All(p => p.ParameterType == typeof(bool)) &&
+                (m.ReturnType == typeof(void) || m.ReturnType == typeof(bool)));
+
+            if (saveThreeBool != null)
+            {
+                triggerMethod = saveThreeBool;
+                triggerArgs = new object[] { false, true, false };
+                return true;
+            }
+
+            MethodInfo saveWorldBool = methods.FirstOrDefault(m =>
+                string.Equals(m.Name, "SaveWorld", StringComparison.OrdinalIgnoreCase) &&
+                m.GetParameters().Length == 1 &&
+                m.GetParameters()[0].ParameterType == typeof(bool) &&
+                (m.ReturnType == typeof(void) || m.ReturnType == typeof(bool)));
+
+            if (saveWorldBool != null)
+            {
+                triggerMethod = saveWorldBool;
+                triggerArgs = new object[] { false };
+                return true;
             }
 
             triggerMethod = null;

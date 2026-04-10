@@ -7,6 +7,7 @@ using System.Reflection;
 using System.Collections.Concurrent;
 using System;
 using System.Threading;
+using System.Collections.Generic;
 
 namespace SimpleBackup
 {
@@ -20,6 +21,7 @@ namespace SimpleBackup
         private Harmony _harmony;
         public static SimpleBackupPlugin Instance;
         private static readonly ConcurrentQueue<string> _uiMessageQueue = new ConcurrentQueue<string>();
+        private static readonly ConcurrentQueue<Action> _mainThreadActions = new ConcurrentQueue<Action>();
         private static int _backupIndicatorActive;
         private static long _backupIndicatorStartTicks;
         private static GUIStyle _backupIndicatorStyle;
@@ -40,6 +42,47 @@ namespace SimpleBackup
 
             Interlocked.Exchange(ref _backupIndicatorActive, 0);
         }
+
+        public static bool TryInvokeOnMainThread(Action action, int timeoutMs = 3000)
+        {
+            if (action == null || Instance == null)
+            {
+                return false;
+            }
+
+            Exception actionException = null;
+            using (var completed = new ManualResetEventSlim(false))
+            {
+                _mainThreadActions.Enqueue(() =>
+                {
+                    try
+                    {
+                        action();
+                    }
+                    catch (Exception ex)
+                    {
+                        actionException = ex;
+                    }
+                    finally
+                    {
+                        completed.Set();
+                    }
+                });
+
+                if (!completed.Wait(timeoutMs))
+                {
+                    return false;
+                }
+            }
+
+            if (actionException != null)
+            {
+                Log?.LogWarning($"Main-thread action failed: {actionException.Message}");
+                return false;
+            }
+
+            return true;
+            }
 
         public static ManualLogSource Log;
 
@@ -83,6 +126,17 @@ namespace SimpleBackup
                 {
                     MessageHud.instance.ShowMessage(MessageHud.MessageType.TopLeft, message);
                 }
+            }
+
+            var pendingMainThreadActions = new List<Action>();
+            while (_mainThreadActions.TryDequeue(out Action action))
+            {
+                pendingMainThreadActions.Add(action);
+            }
+
+            foreach (Action action in pendingMainThreadActions)
+            {
+                action?.Invoke();
             }
 
             if (BackupIntervalMinutes.Value > 0)
