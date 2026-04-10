@@ -1,9 +1,0 @@
-{
-    "name": "Aloncifer-SimpleBackup",
-    "version_number": "0.0.1",
-    "website_url": "https://github.com/AlonResearch/Simple-Backup-Valheim-Mod",
-    "description": "A robust background backup solution for Valheim that protects your worlds and characters using smart zip compression.",
-    "dependencies": [
-        "denikson-BepInExPack_Valheim-5.4.1901"
-    ]
-}
