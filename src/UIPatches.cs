@@ -69,18 +69,14 @@ namespace SimpleBackup
                             BackupCoordinator.BackupStartResult startResult = BackupCoordinator.TryStartBackup(wName, cName);
                             if (startResult == BackupCoordinator.BackupStartResult.Started)
                             {
-                                SimpleBackupPlugin.Log.LogInfo($"Manual UI Backup Triggered! Target: {wName}/{cName}");
-                                if (MessageHud.instance != null)
-                                {
-                                    MessageHud.instance.ShowMessage(MessageHud.MessageType.Center, "Session Backup Started in Background!");
-                                }
+                                SimpleBackupPlugin.Log.LogDebug($"Manual UI backup triggered for world='{wName}', character='{cName}'.");
                             }
-                            else if (MessageHud.instance != null)
+                            else
                             {
                                 string message = startResult == BackupCoordinator.BackupStartResult.CooldownActive
-                                    ? "Backup cooldown active. Please wait 2 seconds before starting another backup."
+                                    ? "Backup on cooldown."
                                     : "Backup already running.";
-                                MessageHud.instance.ShowMessage(MessageHud.MessageType.Center, message);
+                                SimpleBackupPlugin.QueueUIMessage(message);
                             }
                         });
 
