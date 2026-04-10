@@ -12,6 +12,21 @@ SimpleBackup runs on BepInEx 5 and Harmony and currently provides:
 4. Native backup generation through Valheim save APIs.
 5. Main-thread-safe status messaging for user feedback.
 
+## Current Validation Snapshot
+
+Latest in-session validation confirms:
+
+1. Manual backup from the Esc-menu button is working reliably.
+2. Native restore for both world and character is working in the same game session.
+3. Manual backup + native restore loop behaves seamlessly during active play testing.
+
+Validation currently in progress:
+
+1. Console command behavior across host and non-host cases.
+2. Target-specific command paths (`sb.backup world`, `sb.backup char`) across edge cases.
+3. Steam Cloud synchronization interactions after command-triggered backups.
+4. Additional edge-case stability around mixed local/cloud save states.
+
 ## Active Backup Flow
 
 Every backup trigger (button, command, timer) goes through one coordinated flow:

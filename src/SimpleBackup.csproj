@@ -3,7 +3,7 @@
     <TargetFramework>net462</TargetFramework>
     <AssemblyName>SimpleBackup</AssemblyName>
     <Description>Valheim Simple Backup Mod</Description>
-    <Version>0.0.2</Version>
+    <Version>0.0.3</Version>
     <ValheimInstallPath>C:\Program Files (x86)\Steam\steamapps\common\Valheim</ValheimInstallPath>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <LangVersion>latest</LangVersion>
