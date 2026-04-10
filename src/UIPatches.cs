@@ -1,3 +1,5 @@
+using System;
+using System.Linq;
 using HarmonyLib;
 using UnityEngine;
 using UnityEngine.UI;
@@ -25,8 +27,8 @@ namespace SimpleBackup
             if (menuEntries != null)
             {
                 // We clone Settings but anchor to Save for better positioning
-                Transform settingsTemplate = menuEntries.Find("Settings") ?? menuEntries.Find("ButtonSettings");
-                Transform saveAnchor = menuEntries.Find("Save") ?? menuEntries.Find("ButtonSave");
+                Transform settingsTemplate = FindButton(menuEntries, "Settings", "ButtonSettings");
+                Transform saveAnchor = FindButton(menuEntries, "Save", "ButtonSave");
 
                 if (settingsTemplate != null)
                 {
@@ -64,19 +66,56 @@ namespace SimpleBackup
                             string wName = (ZNet.instance != null && ZNet.instance.IsServer()) ? ZNet.instance.GetWorldName() : null;
                             string cName = Player.m_localPlayer != null ? Player.m_localPlayer.GetPlayerName() : null;
 
-                            SimpleBackupPlugin.Log.LogInfo($"Manual UI Backup Triggered! Target: {wName}/{cName}");
-                            System.Threading.Tasks.Task.Run(() => BackupManager.PerformFullBackup(wName, cName));
-                            
-                            if (MessageHud.instance != null)
+                            if (BackupCoordinator.TryStartBackup(wName, cName))
                             {
-                                MessageHud.instance.ShowMessage(MessageHud.MessageType.Center, "Session Backup Started in Background!");
+                                SimpleBackupPlugin.Log.LogInfo($"Manual UI Backup Triggered! Target: {wName}/{cName}");
+                                if (MessageHud.instance != null)
+                                {
+                                    MessageHud.instance.ShowMessage(MessageHud.MessageType.Center, "Session Backup Started in Background!");
+                                }
+                            }
+                            else if (MessageHud.instance != null)
+                            {
+                                MessageHud.instance.ShowMessage(MessageHud.MessageType.Center, "Backup already running.");
                             }
                         });
 
-                        btn.navigation = settingsTemplate.GetComponent<Button>().navigation;
+                        Button templateButton = settingsTemplate.GetComponent<Button>();
+                        if (templateButton != null)
+                        {
+                            btn.navigation = templateButton.navigation;
+                        }
                     }
                 }
             }
+        }
+
+        private static Transform FindButton(Transform root, params string[] labels)
+        {
+            foreach (Button button in root.GetComponentsInChildren<Button>(true))
+            {
+                if (button == null)
+                {
+                    continue;
+                }
+
+                if (labels.Any(label => string.Equals(button.name, label, StringComparison.OrdinalIgnoreCase)))
+                {
+                    return button.transform;
+                }
+
+                TMP_Text text = button.GetComponentInChildren<TMP_Text>(true);
+                if (text != null)
+                {
+                    string value = text.text != null ? text.text.Trim() : string.Empty;
+                    if (labels.Any(label => string.Equals(value, label, StringComparison.OrdinalIgnoreCase)))
+                    {
+                        return button.transform;
+                    }
+                }
+            }
+
+            return root.Find(labels.FirstOrDefault());
         }
     }
 }
