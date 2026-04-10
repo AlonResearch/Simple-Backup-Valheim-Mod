@@ -11,10 +11,28 @@ namespace SimpleBackup
 {
     public static class BackupManager
     {
+        public enum BackupSaveType
+        {
+            Unknown,
+            Character,
+            World
+        }
+
+        public struct BackupArchiveInfo
+        {
+            public string TargetName;
+            public string SourceCategory;
+            public string ArchivePath;
+            public BackupSaveType SaveType;
+            public DateTime CreatedAt;
+        }
+
         public struct BackupTargetInfo
         {
             public string TargetName;
             public string LatestBackupPath;
+            public string SourceCategory;
+            public BackupSaveType SaveType;
             public DateTime CreatedAt;
         }
 
@@ -34,160 +52,95 @@ namespace SimpleBackup
 
         public static void PerformFullBackup(string targetWorld = null, string targetCharacter = null)
         {
-            SimpleBackupPlugin.Log.LogInfo("Starting Backup procedure...");
-            var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+            SimpleBackupPlugin.Log.LogInfo("Starting native backup procedure...");
 
-            List<string> sourceDirectories = GetValheimSaveDirectories();
-            int successCount = 0;
-            long totalBytes = 0;
-            
-            foreach (string dir in sourceDirectories)
+            if (ZNet.instance == null)
             {
-                if (!Directory.Exists(dir)) continue;
+                string message = "Backup skipped because the native Valheim save backend is not available in the current scene.";
+                SimpleBackupPlugin.QueueUIMessage(message);
+                SimpleBackupPlugin.Log.LogWarning(message);
+                return;
+            }
 
-                string folderName = new DirectoryInfo(dir).Name; // "worlds", "characters", "worlds_local", etc.
-                bool isCharacter = folderName.Contains("character");
+            var backupItems = new List<string>();
 
-                if (!ShouldBackupDirectory(isCharacter, targetWorld, targetCharacter))
+            if (!string.IsNullOrEmpty(targetWorld))
+            {
+                backupItems.Add(DescribeNativeTarget(BackupSaveType.World, targetWorld));
+                TryCreateNativeBackup(targetWorld, SaveDataType.World);
+            }
+
+            if (!string.IsNullOrEmpty(targetCharacter))
+            {
+                backupItems.Add(DescribeNativeTarget(BackupSaveType.Character, targetCharacter));
+                TryCreateNativeBackup(targetCharacter, SaveDataType.Character);
+            }
+
+            if (backupItems.Count == 0)
+            {
+                if (ZNet.instance.IsServer())
                 {
-                    continue;
+                    string worldName = ZNet.instance.GetWorldName();
+                    if (!string.IsNullOrEmpty(worldName))
+                    {
+                        backupItems.Add(DescribeNativeTarget(BackupSaveType.World, worldName));
+                        TryCreateNativeBackup(worldName, SaveDataType.World);
+                    }
                 }
 
-                var metrics = BackupDirectory(dir, isCharacter, targetWorld, targetCharacter);
-                successCount += metrics.Count;
-                totalBytes += metrics.Bytes;
+                if (Player.m_localPlayer != null)
+                {
+                    string characterName = Player.m_localPlayer.GetPlayerName();
+                    if (!string.IsNullOrEmpty(characterName))
+                    {
+                        backupItems.Add(DescribeNativeTarget(BackupSaveType.Character, characterName));
+                        TryCreateNativeBackup(characterName, SaveDataType.Character);
+                    }
+                }
             }
-            
-            stopwatch.Stop();
-            double seconds = stopwatch.Elapsed.TotalSeconds;
-            double megabytes = totalBytes / 1048576.0;
 
-            if (successCount > 0)
+            if (backupItems.Count > 0)
             {
-                string scope = DescribeBackupScope(targetWorld, targetCharacter, successCount);
-                string msg = $"Backup complete for {scope}! {successCount} save(s) ({megabytes:F2} MB) safely archived in {seconds:F1}s.";
+                string scope = string.Join(" and ", backupItems.Distinct().ToArray());
+                string msg = $"Native backup complete for {scope}.";
                 SimpleBackupPlugin.QueueUIMessage(msg);
                 SimpleBackupPlugin.Log.LogInfo(msg);
             }
             else
             {
-                string scope = DescribeBackupScope(targetWorld, targetCharacter, successCount);
-                string msg = $"Backup process finished for {scope}, but no matching saves were found to backup.";
+                string msg = "No current character or hosted world was available for native backup.";
                 SimpleBackupPlugin.QueueUIMessage(msg);
                 SimpleBackupPlugin.Log.LogWarning(msg);
             }
         }
 
-        private static BackupMetrics BackupDirectory(string directoryPath, bool isCharacter, string targetWorld, string targetCharacter)
+        private static bool TryCreateNativeBackup(string saveName, SaveDataType saveDataType)
         {
-            BackupMetrics metrics = new BackupMetrics();
-            string backupRoot = GetBackupRootDirectory();
-            string categoryName = directoryPath.Contains("remote") ? "SteamCloud_" + new DirectoryInfo(directoryPath).Name : "Local_" + new DirectoryInfo(directoryPath).Name;
-            string targetBackupFolder = Path.Combine(backupRoot, categoryName);
-            if (!Directory.Exists(targetBackupFolder)) Directory.CreateDirectory(targetBackupFolder);
-
-            var files = Directory.GetFiles(directoryPath).Where(f => !f.EndsWith(".old") && !f.EndsWith(".zip")).ToList();
-            
-            // Group files by base name for worlds (.fwl and .db match), chars just have .fch and maybe .ptx
-            var groupedFiles = files.GroupBy(f => Path.GetFileNameWithoutExtension(f)).ToList();
-
-            string timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
-
-            foreach (var group in groupedFiles)
+            try
             {
-                string baseName = group.Key;
-                if (string.IsNullOrEmpty(baseName)) continue;
-
-                // Restrict backup to only the actively specified targets if they are provided
-                if (isCharacter && !string.IsNullOrEmpty(targetCharacter) && !baseName.Equals(targetCharacter, StringComparison.OrdinalIgnoreCase)) continue;
-                if (!isCharacter && !string.IsNullOrEmpty(targetWorld) && !baseName.Equals(targetWorld, StringComparison.OrdinalIgnoreCase)) continue;
-
-                string zipFileName = $"{timestamp}-{baseName}.zip";
-                string zipFilePath = Path.Combine(targetBackupFolder, zipFileName);
-
-                try
+                bool created = ZNet.ConsiderAutoBackup(saveName, saveDataType, DateTime.Now);
+                if (created)
                 {
-                    using (ZipArchive archive = ZipFile.Open(zipFilePath, ZipArchiveMode.Create))
-                    {
-                        foreach (string file in group)
-                        {
-                            archive.CreateEntryFromFile(file, Path.GetFileName(file));
-                        }
-                    }
-                    var fileInfo = new FileInfo(zipFilePath);
-                    metrics.Bytes += fileInfo.Length;
-                    metrics.Count++;
-                    SimpleBackupPlugin.Log.LogInfo($"Backed up {baseName} to {zipFileName}");
-                }
-                catch (Exception ex)
-                {
-                    SimpleBackupPlugin.Log.LogError($"Failed to backup {baseName}: {ex.Message}");
+                    SimpleBackupPlugin.Log.LogInfo($"Native backup created for {DescribeNativeTarget(saveDataType == SaveDataType.World ? BackupSaveType.World : BackupSaveType.Character, saveName)}");
                 }
 
-                EnforceRetentionPolicy(targetBackupFolder, baseName);
+                return created;
             }
-            
-            return metrics;
-        }
-
-        private static bool ShouldBackupDirectory(bool isCharacterDirectory, string targetWorld, string targetCharacter)
-        {
-            bool wantsWorld = !string.IsNullOrEmpty(targetWorld);
-            bool wantsCharacter = !string.IsNullOrEmpty(targetCharacter);
-
-            if (!wantsWorld && !wantsCharacter)
+            catch (Exception ex)
             {
-                return true;
-            }
-
-            return isCharacterDirectory ? wantsCharacter : wantsWorld;
-        }
-
-        private static void EnforceRetentionPolicy(string backupDirectory, string baseName)
-        {
-            int maxBackups = SimpleBackupPlugin.MaxBackupsToKeep.Value;
-            if (maxBackups <= 0) return;
-
-            var allZips = Directory.GetFiles(backupDirectory, $"*-{baseName}.zip")
-                                   .Select(f => new FileInfo(f))
-                                   .OrderByDescending(f => f.CreationTime)
-                                   .ToList();
-
-            if (allZips.Count > maxBackups)
-            {
-                for (int i = maxBackups; i < allZips.Count; i++)
-                {
-                    try
-                    {
-                        allZips[i].Delete();
-                        SimpleBackupPlugin.Log.LogInfo($"Deleted old backup: {allZips[i].Name}");
-                    }
-                    catch { }
-                }
+                SimpleBackupPlugin.Log.LogError($"Native backup failed for {saveName}: {ex.Message}");
+                return false;
             }
         }
 
-        private static string DescribeBackupScope(string targetWorld, string targetCharacter, int successCount)
+        private static string DescribeNativeTarget(BackupSaveType saveType, string saveName)
         {
-            bool hasWorld = !string.IsNullOrEmpty(targetWorld);
-            bool hasCharacter = !string.IsNullOrEmpty(targetCharacter);
-
-            if (hasWorld && hasCharacter)
+            if (string.IsNullOrEmpty(saveName))
             {
-                return $"world '{targetWorld}' and character '{targetCharacter}'";
+                return saveType == BackupSaveType.World ? "world" : "character";
             }
 
-            if (hasWorld)
-            {
-                return $"world '{targetWorld}'";
-            }
-
-            if (hasCharacter)
-            {
-                return $"character '{targetCharacter}'";
-            }
-
-            return successCount > 0 ? "the current save targets" : "the requested save targets";
+            return saveType == BackupSaveType.World ? $"world '{saveName}'" : $"character '{saveName}'";
         }
 
         public static List<string> GetValheimSaveDirectories()
@@ -256,28 +209,82 @@ namespace SimpleBackup
         {
             var latestByTarget = new Dictionary<string, BackupTargetInfo>(StringComparer.OrdinalIgnoreCase);
 
-            foreach (string backupPath in GetAllAvailableBackups())
+            foreach (BackupArchiveInfo archive in GetAllBackupArchives())
             {
-                string targetName = GetTargetNameFromBackupFile(backupPath);
+                string targetName = archive.TargetName;
                 if (string.IsNullOrEmpty(targetName))
                 {
                     continue;
                 }
 
-                DateTime createdAt = File.GetCreationTime(backupPath);
                 BackupTargetInfo current;
-                if (!latestByTarget.TryGetValue(targetName, out current) || createdAt > current.CreatedAt)
+                string targetKey = BuildTargetKey(archive.SaveType, targetName);
+                if (!latestByTarget.TryGetValue(targetKey, out current) || archive.CreatedAt > current.CreatedAt)
                 {
-                    latestByTarget[targetName] = new BackupTargetInfo
+                    latestByTarget[targetKey] = new BackupTargetInfo
                     {
                         TargetName = targetName,
-                        LatestBackupPath = backupPath,
-                        CreatedAt = createdAt
+                        LatestBackupPath = archive.ArchivePath,
+                        SourceCategory = archive.SourceCategory,
+                        SaveType = archive.SaveType,
+                        CreatedAt = archive.CreatedAt
                     };
                 }
             }
 
             return latestByTarget.Values.OrderByDescending(entry => entry.CreatedAt).ToList();
+        }
+
+        public static List<BackupArchiveInfo> GetAllBackupArchives()
+        {
+            List<BackupArchiveInfo> archives = new List<BackupArchiveInfo>();
+            string root = GetBackupRootDirectory();
+            if (!Directory.Exists(root))
+            {
+                return archives;
+            }
+
+            foreach (string categoryDir in Directory.GetDirectories(root))
+            {
+                string sourceCategory = new DirectoryInfo(categoryDir).Name;
+                foreach (string archivePath in Directory.GetFiles(categoryDir, "*.zip"))
+                {
+                    BackupArchiveInfo archiveInfo;
+                    if (TryCreateBackupArchiveInfo(archivePath, sourceCategory, out archiveInfo))
+                    {
+                        archives.Add(archiveInfo);
+                    }
+                }
+            }
+
+            return archives.OrderByDescending(archive => archive.CreatedAt).ToList();
+        }
+
+        public static bool TryCreateBackupArchiveInfo(string archivePath, string sourceCategory, out BackupArchiveInfo archiveInfo)
+        {
+            archiveInfo = default(BackupArchiveInfo);
+
+            if (string.IsNullOrEmpty(archivePath) || !File.Exists(archivePath))
+            {
+                return false;
+            }
+
+            string targetName = GetTargetNameFromBackupFile(archivePath);
+            if (string.IsNullOrEmpty(targetName))
+            {
+                return false;
+            }
+
+            archiveInfo = new BackupArchiveInfo
+            {
+                TargetName = targetName,
+                SourceCategory = sourceCategory,
+                ArchivePath = archivePath,
+                SaveType = GetSaveTypeFromCategory(sourceCategory),
+                CreatedAt = File.GetCreationTime(archivePath)
+            };
+
+            return true;
         }
 
         public static string GetTargetNameFromBackupFile(string backupPath)
@@ -306,6 +313,32 @@ namespace SimpleBackup
             }
 
             return fileName.Trim();
+        }
+
+        public static BackupSaveType GetSaveTypeFromCategory(string sourceCategory)
+        {
+            if (string.IsNullOrEmpty(sourceCategory))
+            {
+                return BackupSaveType.Unknown;
+            }
+
+            string normalized = sourceCategory.ToLowerInvariant();
+            if (normalized.Contains("character"))
+            {
+                return BackupSaveType.Character;
+            }
+
+            if (normalized.Contains("world"))
+            {
+                return BackupSaveType.World;
+            }
+
+            return BackupSaveType.Unknown;
+        }
+
+        private static string BuildTargetKey(BackupSaveType saveType, string targetName)
+        {
+            return $"{saveType}:{targetName}";
         }
     }
 }

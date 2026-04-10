@@ -36,13 +36,6 @@ namespace SimpleBackup
         public static void RegisterCommands()
         {
             bool injected = false;
-            
-            if (!CommandExists("sb.restore"))
-            {
-                new Terminal.ConsoleCommand("sb.restore", "Restores a backup.", (args) => HandleRestoreCommand(args.Context, args.Args),
-                    isCheat: false, isNetwork: false, onlyServer: false, isSecret: false);
-                injected = true;
-            }
 
             if (!CommandExists("sb.backup"))
             {
@@ -166,13 +159,10 @@ namespace SimpleBackup
 
         private static void HandleRestoreCommand(Terminal context, string[] args)
         {
-            if (args.Length < 2)
+            if (context != null)
             {
-                context.AddString("Usage: sb.restore <SaveName>");
-                return;
+                context.AddString("sb.restore is temporarily disabled while the native Manage Saves restore flow is being rebuilt.");
             }
-
-            TryRestoreLatestBackup(args[1], context != null ? new Action<string>(context.AddString) : null);
         }
 
         public static bool TryRestoreLatestBackup(string saveName, Action<string> reportMessage)

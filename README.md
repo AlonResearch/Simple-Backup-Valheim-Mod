@@ -1,62 +1,76 @@
-# 🛡️ SimpleBackup: Technical Ground Truth
+# SimpleBackup
 
-**SimpleBackup** is a performance-first, host-aware backup engine for Valheim. This document serves as the definitive technical specification and operational logic for the mod, intended as the primary source of truth for maintainers and automated agents.
+SimpleBackup is a Valheim backup plugin that provides fast in-game backup triggers while using the game's native backup backend and native save ecosystem.
 
----
+## Current State
 
-## 🏗️ Core Architecture
+SimpleBackup runs on BepInEx 5 and Harmony and currently provides:
 
-SimpleBackup operates as a **BepInEx 5** plugin using **Harmony** for runtime UI injection. It is designed to be completely decoupled from large modding frameworks like Jotunn to ensure maximum compatibility and zero dependency bloat.
+1. Esc-menu backup button integrated into the existing pause menu.
+2. Console backup commands for targeted and combined backups.
+3. Automatic timed backups through plugin config.
+4. Native backup generation through Valheim save APIs.
+5. Main-thread-safe status messaging for user feedback.
 
-### 1. Context-Aware Target Logic
-The mod intelligently isolates backup targets based on the current game state:
-- **Host Check**: Determined via `ZNet.instance.IsServer()`.
-- **Target Extraction**:
-    - **World Name**: `ZNet.instance.GetWorldName()` (only if Host).
-    - **Character Name**: `Player.m_localPlayer.GetPlayerName()`.
-- **Ground Truth**: If the player is a client on a dedicated server, `PerformFullBackup` is invoked with a `null` world parameter, ensuring only the local character profile is secured.
+## Active Backup Flow
 
-### 2. File Topology & Path Resolution
-Valheim save data is highly fragmented due to Steam Cloud and legacy updates. SimpleBackup sweeps three distinct layers:
-- **Registry Engine (Windows Only)**: Accesses `HKEY_LOCAL_MACHINE\SOFTWARE\WOW6432Node\Valve\Steam` to locate the local Steam installation. It then iterates through all `userdata` folders to find AppID `892970` (Valheim) remote saves.
-- **LocalLow Engine**: Probes `%USERPROFILE%\AppData\LocalLow\IronGate\Valheim\` for `worlds`, `worlds_local`, `characters`, and `characters_local`.
-- **Ground Truth**: Backups are archived in a dedicated central directory: `%USERPROFILE%\AppData\LocalLow\IronGate\Valheim\SimpleBackup`. This directory is outside the standard save paths to prevent Steam Cloud from attempting to sync large `.zip` archives.
+Every backup trigger (button, command, timer) goes through one coordinated flow:
 
-### 3. Concurrency & Main-Thread Safety
-Unity is single-threaded for most engine operations. SimpleBackup enforces strict concurrency rules to prevent game lag:
-- **Asynchronous I/O**: All compression and disk operations (`ZipFile.CreateEntryFromFile`) MUST run via `System.Threading.Tasks.Task.Run()`.
-- **Cross-Thread UI Messaging**: Since background tasks cannot touch Unity UI (like `MessageHud`), SimpleBackup utilizes a `ConcurrentQueue<string>` system.
-    - Background tasks push messages to the queue.
-    - The `Update()` loop on the main thread polls `TryDequeue` and safely invokes `MessageHud.instance.ShowMessage`.
+1. Determine active targets from game state.
+2. Start a single backup job through the coordinator gate.
+3. Call Valheim native backup creation per target.
+4. Report completion to UI and console.
 
-### 4. Console System & Resilience
-To ensure commands are always available even when other mods (like Jotunn) attempt to wipe the terminal dictionary:
-- **Reflection Injection**: Uses `System.Reflection` to access the private `Terminal.commands` dictionary.
-- **Failsafe Registration**: The `Update()` loop performs a heartbeat check every 2.0 seconds. If `sb.backup` is missing from the dictionary, the mod force-re-registers all `sb.*` commands.
-- **Restoration Safety**: `sb.restore` is hard-locked to the **Main Menu** (`ZNet.instance == null`) to prevent fatal race conditions while game databases are open.
+Target behavior:
 
-### 5. Data Integrity: The `.old` Strategy
-During restoration, SimpleBackup never immediately overwrites active saves:
-1. Current `.db`/`.fwl`/`.fch` files are renamed with a `.old` suffix.
-2. The archive is extracted cleanly into the source directory.
-3. This ensures that even a failed restore does not result in data loss.
+1. Hosted session: world + character can be backed up.
+2. Client session: character backup is available.
+3. Explicit command mode supports world-only or character-only targeting.
 
----
+## Native Compatibility Direction
 
-## 🛠️ Ground Truth Feature Set
+Project direction is native-first backup compatibility:
 
-| Feature | Implementation Detail |
-| :--- | :--- |
-| **Manual Trigger** | Cloned "Settings" button in Esc Menu, positioned via `SetSiblingIndex`. |
-| **Auto-Backup** | Background timer configurable via `.cfg`. |
-| **Metrics** | Tracks total bytes and duration using `Stopwatch` and `FileInfo`. |
-| **Retention** | `MaxBackupsToKeep` config determines how many zips are kept per character/world. |
-| **Commands** | `sb.backup` (manual sync), `sb.list` (history), `sb.restore` (safety extraction). |
+1. Keep backup UX entry points in this mod.
+2. Keep generated backups compatible with Valheim's native backup/restore system.
+3. Use the game's existing save management surface as the primary restore/listing experience.
 
----
+This keeps backup creation accessible while aligning storage and restore behavior with Valheim-native conventions.
 
-## 📥 Installation Logic
-- **Mod Manager**: Primary channel. The `.zip` contains a standard `manifest.json`, `icon.png`, and the `plugins/SimpleBackup.dll`.
-- **Manual**: Direct drop of `SimpleBackup.dll` into `BepInEx/plugins`.
+## Runtime Architecture
 
-*Developed by Aloncifer.*
+1. Plugin lifecycle: BepInEx plugin with Harmony patch registration.
+2. Backup execution: asynchronous jobs guarded by a single-flight coordinator and cooldown.
+3. Messaging: cross-thread queue consumed on Update for safe in-game notifications.
+4. Save awareness: world/character target resolution uses current ZNet and player state.
+
+## Commands and UX
+
+Available command surface:
+
+1. sb.backup
+2. sb.backup world
+3. sb.backup char
+4. sb.list
+
+Primary in-game UX:
+
+1. Backup button in Esc menu.
+2. Top-left completion and status messages.
+
+## Configuration
+
+Config file: com.aloncifer.simplebackup.cfg
+
+1. BackupIntervalMinutes: minutes between automatic backups. 0 disables timer.
+2. MaxBackupsToKeep: retention setting currently used by legacy archive indexing paths.
+
+## Build and Install
+
+1. Build target: .NET Framework 4.6.2.
+2. Output: SimpleBackup.dll for BepInEx plugins folder.
+3. Packaging: Thunderstore-ready layout with plugin DLL in plugins.
+
+## Project Direction Summary
+
+SimpleBackup is evolving into a native-compatible backup frontend: quick triggers, deterministic target selection, and backup outputs that integrate seamlessly with Valheim's own save and restore model.
