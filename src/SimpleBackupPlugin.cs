@@ -98,7 +98,7 @@ namespace SimpleBackup
                     {
                         if (startResult == BackupCoordinator.BackupStartResult.CooldownActive)
                         {
-                            Logger.LogWarning("Skipped scheduled backup because the 10-second backup cooldown is active.");
+                            Logger.LogWarning("Skipped scheduled backup because the 2-second backup cooldown is active.");
                         }
                         else
                         {

@@ -116,7 +116,7 @@ namespace SimpleBackup
             {
                 if (startResult == BackupCoordinator.BackupStartResult.CooldownActive)
                 {
-                    context.AddString("Backup cooldown active. Please wait 10 seconds before starting another backup.");
+                    context.AddString("Backup cooldown active. Please wait 2 seconds before starting another backup.");
                 }
                 else
                 {

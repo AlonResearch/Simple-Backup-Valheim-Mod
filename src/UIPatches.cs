@@ -78,7 +78,7 @@ namespace SimpleBackup
                             else if (MessageHud.instance != null)
                             {
                                 string message = startResult == BackupCoordinator.BackupStartResult.CooldownActive
-                                    ? "Backup cooldown active. Please wait 10 seconds before starting another backup."
+                                    ? "Backup cooldown active. Please wait 2 seconds before starting another backup."
                                     : "Backup already running.";
                                 MessageHud.instance.ShowMessage(MessageHud.MessageType.Center, message);
                             }

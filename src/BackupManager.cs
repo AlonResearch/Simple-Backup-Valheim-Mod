@@ -64,13 +64,15 @@ namespace SimpleBackup
 
             if (successCount > 0)
             {
-                string msg = $"Backup complete! {successCount} saves ({megabytes:F2} MB) safely archived in {seconds:F1}s.";
+                string scope = DescribeBackupScope(targetWorld, targetCharacter, successCount);
+                string msg = $"Backup complete for {scope}! {successCount} save(s) ({megabytes:F2} MB) safely archived in {seconds:F1}s.";
                 SimpleBackupPlugin.QueueUIMessage(msg);
                 SimpleBackupPlugin.Log.LogInfo(msg);
             }
             else
             {
-                string msg = "Backup process finished, but no matching saves were found to backup.";
+                string scope = DescribeBackupScope(targetWorld, targetCharacter, successCount);
+                string msg = $"Backup process finished for {scope}, but no matching saves were found to backup.";
                 SimpleBackupPlugin.QueueUIMessage(msg);
                 SimpleBackupPlugin.Log.LogWarning(msg);
             }
@@ -163,6 +165,29 @@ namespace SimpleBackup
                     catch { }
                 }
             }
+        }
+
+        private static string DescribeBackupScope(string targetWorld, string targetCharacter, int successCount)
+        {
+            bool hasWorld = !string.IsNullOrEmpty(targetWorld);
+            bool hasCharacter = !string.IsNullOrEmpty(targetCharacter);
+
+            if (hasWorld && hasCharacter)
+            {
+                return $"world '{targetWorld}' and character '{targetCharacter}'";
+            }
+
+            if (hasWorld)
+            {
+                return $"world '{targetWorld}'";
+            }
+
+            if (hasCharacter)
+            {
+                return $"character '{targetCharacter}'";
+            }
+
+            return successCount > 0 ? "the current save targets" : "the requested save targets";
         }
 
         public static List<string> GetValheimSaveDirectories()

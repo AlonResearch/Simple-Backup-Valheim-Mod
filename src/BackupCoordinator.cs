@@ -13,7 +13,7 @@ namespace SimpleBackup
             CooldownActive
         }
 
-        private const int MinimumBackupIntervalSeconds = 10;
+        private const int MinimumBackupIntervalSeconds = 2;
         private static readonly object _backupGate = new object();
         private static int _backupInProgress;
         private static long _lastBackupStartTicks;
