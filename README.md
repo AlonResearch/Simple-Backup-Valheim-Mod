@@ -10,7 +10,7 @@ SimpleBackup currently provides:
 2. Console commands: `sb.backup`, `sb.backup world`, `sb.backup char`, `sb.list`.
 3. Automatic timed backups (optional) via config.
 4. Native backup creation through Valheim save APIs.
-5. Save-before-backup synchronization with compatibility fallback.
+5. Save-before-backup synchronization through current-version ZNet save flow.
 6. Single-flight execution with cooldown guard.
 7. Minimalist UX messaging with duration in completion/failure toasts.
 8. Flashing top-right backup indicator while backup is running.
@@ -20,9 +20,9 @@ SimpleBackup currently provides:
 Every trigger path (button, command, timer) follows the same pipeline:
 
 1. Resolve requested target intent.
-2. Enter coordinator gate (no overlap, short cooldown).
-3. Trigger native save sync before backup (SaveSystem path when available).
-4. Fall back to ZNet save trigger when SaveSystem trigger is unavailable on this game build.
+2. Enter coordinator gate (no overlap, 5-second cooldown).
+3. Trigger native save sync via `ZNet.Save(false, true, false)` on main thread.
+4. Wait for `ZNet.SaveDoneTime` to advance.
 5. Create native backup(s) for selected target(s).
 6. Emit concise completion/failure toast with elapsed time.
 
@@ -31,8 +31,8 @@ Important behavior details:
 1. Explicit target commands are strict.
 2. `sb.backup world` will not silently fall back to character.
 3. `sb.backup char` will not silently fall back to world.
-4. If neither save trigger is available, backup continues in best-effort mode after a short settle delay.
-5. If a save status method exists but completion cannot be confirmed within timeout, backup is canceled to avoid stale snapshots.
+4. Backup sync is current-version only and does not use legacy trigger discovery fallbacks.
+5. If save completion cannot be confirmed within timeout, backup is canceled to avoid stale snapshots.
 
 ## User Experience
 
@@ -40,7 +40,8 @@ Design goals are minimal and informative:
 
 1. No center-screen backup spam.
 2. Flashing top-right backup badge while backup is running.
-3. Concise top-left toast on completion/failure/cancel with timing.
+3. Backup button is grayed out while backup is running or cooldown is active.
+4. Concise top-left toast on completion/failure/cancel with timing.
 
 Examples:
 
@@ -67,6 +68,11 @@ Examples:
 3. `sb.backup char` - character only.
 4. `sb.list` - lists legacy archive index entries.
 
+Cooldown behavior:
+
+1. Backup actions use a 5-second cooldown window.
+2. During cooldown, the Esc-menu `Backup` button remains disabled (grayed out).
+
 ## Configuration
 
 Config file: `com.aloncifer.simplebackup.cfg`
@@ -90,4 +96,4 @@ Retention behavior:
 
 1. The backup badge uses IMGUI; icon glyph rendering can vary by system font.
 2. Native restore/list rendering is still Valheim-owned UI behavior.
-3. Save trigger availability differs by Valheim build. This plugin supports SaveSystem trigger first, then ZNet fallback.
+3. This build targets current Valheim save APIs and intentionally removes legacy trigger compatibility paths.

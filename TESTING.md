@@ -1,6 +1,6 @@
 # TESTING GUIDE: SimpleBackup (Current Ground Truth)
 
-This test plan validates all currently implemented backup features, including save-sync reliability, strict target behavior, indicator UX, duration toasts, and cross-build save-trigger compatibility.
+This test plan validates all currently implemented backup features, including current-version save-sync reliability, strict target behavior, indicator UX, duration toasts, retention pruning, and button cooldown states.
 
 ## 1. Prerequisites
 
@@ -28,6 +28,7 @@ Expected:
 
 1. Backup button is present.
 2. No Harmony patch exceptions for menu injection.
+3. Backup button becomes disabled while backup is running and during cooldown.
 
 ## 4. Backup Indicator UX Check
 
@@ -64,7 +65,7 @@ Character freshness:
 Expected:
 
 1. Restored character includes the latest change.
-2. If SaveSystem trigger is unavailable on this build, backup still runs via compatibility fallback.
+2. Save was triggered through ZNet sync path before backup creation.
 
 World freshness:
 
@@ -117,6 +118,8 @@ Expected:
 
 1. `Backup on cooldown.` or `Backup already running.` appears.
 2. No overlapping backup jobs start.
+3. Cooldown is approximately 5 seconds.
+4. Esc-menu Backup button is grayed out while cooldown is active.
 
 ## 10. Scene Gating
 
@@ -158,18 +161,16 @@ Expected:
 2. Warnings/errors appear only for actionable problems (sync unavailable, target unavailable, etc.).
 3. No noisy repetitive spam each frame.
 
-## 14. Save Trigger Compatibility Regression
+## 14. Current-Version Save Sync Regression
 
-1. Start game on current build and trigger backup once.
+1. Start game and trigger backup once.
 2. Inspect logs for save trigger routing.
 
 Expected:
 
-1. One of these paths is used:
-1. SaveSystem trigger path.
-2. ZNet fallback trigger path.
-2. Backup should not hard-fail repeatedly only because SaveSystem trigger is missing.
-3. If both trigger paths are unavailable, backup proceeds best-effort and logs a warning.
+1. Save sync uses `ZNet.Save(false, true, false)` path.
+2. Backup waits for save completion signal before creating backup.
+3. No legacy `No compatible native save trigger method was found` warnings.
 
 ## 15. Native Retention Validation
 
