@@ -79,7 +79,7 @@ namespace SimpleBackup
                     return;
                 }
 
-                StartBackupFromConsole(context, null, cName, $"Starting background backup for character: {cName}...");
+                StartBackupFromConsole(context, null, cName, $"Backup started: character '{cName}'.");
                 return;
             }
 
@@ -91,7 +91,7 @@ namespace SimpleBackup
                     return;
                 }
 
-                StartBackupFromConsole(context, wName, null, $"Starting background backup for world: {wName}...");
+                StartBackupFromConsole(context, wName, null, $"Backup started: world '{wName}'.");
                 return;
             }
 
@@ -102,7 +102,7 @@ namespace SimpleBackup
             }
 
             string targetLabel = DescribeTarget(wName, cName);
-            StartBackupFromConsole(context, wName, cName, $"Starting background backup for {targetLabel}...");
+            StartBackupFromConsole(context, wName, cName, $"Backup started: {targetLabel}.");
         }
 
         private static void StartBackupFromConsole(Terminal context, string worldName, string characterName, string startMessage)
@@ -116,11 +116,11 @@ namespace SimpleBackup
             {
                 if (startResult == BackupCoordinator.BackupStartResult.CooldownActive)
                 {
-                    context.AddString("Backup cooldown active. Please wait 2 seconds before starting another backup.");
+                    context.AddString("Backup on cooldown.");
                 }
                 else
                 {
-                    context.AddString("A backup is already running. Please wait for it to finish.");
+                    context.AddString("Backup already running.");
                 }
             }
         }
@@ -129,17 +129,17 @@ namespace SimpleBackup
         {
             if (!string.IsNullOrEmpty(worldName) && !string.IsNullOrEmpty(characterName))
             {
-                return $"world: {worldName} and character: {characterName}";
+                return $"world '{worldName}' and character '{characterName}'";
             }
 
             if (!string.IsNullOrEmpty(worldName))
             {
-                return $"world: {worldName}";
+                return $"world '{worldName}'";
             }
 
             if (!string.IsNullOrEmpty(characterName))
             {
-                return $"character: {characterName}";
+                return $"character '{characterName}'";
             }
 
             return "the current save targets";
