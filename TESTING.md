@@ -1,4 +1,4 @@
-# TESTING GUIDE: SimpleBackup (Current Ground Truth)
+# TESTING GUIDE: SimpleBackup beta 0.1.0 (Current Ground Truth)
 
 This test plan validates all currently implemented backup features, including current-version save-sync reliability, strict target behavior, indicator UX, duration toasts, retention pruning, and button cooldown states.
 
@@ -65,7 +65,7 @@ Character freshness:
 Expected:
 
 1. Restored character includes the latest change.
-2. Save was triggered through ZNet sync path before backup creation.
+2. Backup triggers the same native Save-button flow first, then creates backup after save completion is confirmed.
 
 World freshness:
 
@@ -79,6 +79,21 @@ Expected:
 
 1. Restored world includes latest change.
 2. No stale snapshot from pre-change state.
+
+Inventory race regression (berry scenario):
+
+1. Enter world with an empty character inventory.
+2. Pick up exactly one berry (or another unique single item).
+3. Open Esc menu and trigger backup.
+4. Wait for `Backup complete (...)` toast.
+5. Drop the item from inventory.
+6. Exit to menu and restore the exact latest character backup entry.
+7. Load the same character again.
+
+Expected:
+
+1. The restored character has the backed-up item in inventory.
+2. If item is missing, collect logs for save/backup ordering (SaveStartTime/SaveDoneTime flow) and exact backup filename restored.
 
 ## 7. Command Pipeline Validation
 
@@ -168,9 +183,9 @@ Expected:
 
 Expected:
 
-1. Save sync uses `ZNet.Save(false, true, false)` path.
+1. Save sync uses native Save-button routing (menu save handler or the Save button `onClick` path).
 2. Backup waits for save completion signal before creating backup.
-3. No legacy `No compatible native save trigger method was found` warnings.
+3. No `Failed to trigger native Save-button flow before backup.` warnings during normal in-world use.
 
 ## 15. Native Retention Validation
 

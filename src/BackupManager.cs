@@ -5,10 +5,13 @@ using System.IO.Compression;
 using System.Linq;
 using Microsoft.Win32;
 using UnityEngine;
+using UnityEngine.UI;
 using System.Text.RegularExpressions;
 using System.Reflection;
 using System.Threading;
 using System.Diagnostics;
+using TMPro;
+using HarmonyLib;
 
 namespace SimpleBackup
 {
@@ -16,7 +19,8 @@ namespace SimpleBackup
     {
         private const int SaveSyncTimeoutMs = 10000;
         private const int SavePollIntervalMs = 100;
-        private const int SaveSettleDelayMs = 350;
+        private const int SaveSettleDelayMs = 1000;
+        private const int SaveWriteConfirmationTimeoutMs = 2500;
 
         public enum BackupSaveType
         {
@@ -73,7 +77,7 @@ namespace SimpleBackup
             SimpleBackupPlugin.SetBackupIndicatorActive(true);
             try
             {
-                bool syncSuccessful = TrySyncLiveStateBeforeBackup();
+                bool syncSuccessful = TrySyncLiveStateBeforeBackup(targetWorld, targetCharacter);
                 if (!syncSuccessful)
                 {
                     string msg = $"Backup canceled ({duration.Elapsed.TotalSeconds:0.0}s): could not confirm current save state.";
@@ -145,7 +149,14 @@ namespace SimpleBackup
             }
         }
 
-        private static bool TrySyncLiveStateBeforeBackup()
+        private sealed class SaveWriteProbe
+        {
+            public string Label;
+            public string Path;
+            public DateTime BaselineWriteUtc;
+        }
+
+        private static bool TrySyncLiveStateBeforeBackup(string targetWorld, string targetCharacter)
         {
             try
             {
@@ -155,9 +166,13 @@ namespace SimpleBackup
                     return false;
                 }
 
+                List<SaveWriteProbe> probes = CollectSaveWriteProbes(targetWorld, targetCharacter);
+
+                float baselineStartTime = 0f;
                 float baselineDoneTime = 0f;
                 bool baselineRead = SimpleBackupPlugin.TryInvokeOnMainThread(() =>
                 {
+                    baselineStartTime = ZNet.instance.SaveStartTime;
                     baselineDoneTime = ZNet.instance.SaveDoneTime;
                 }, timeoutMs: 3000);
 
@@ -167,37 +182,52 @@ namespace SimpleBackup
                     return false;
                 }
 
-                bool saveTriggered = SimpleBackupPlugin.TryInvokeOnMainThread(() =>
+                string saveTriggerRoute = null;
+                bool nativeSaveTriggered = false;
+                bool saveTriggerInvoked = SimpleBackupPlugin.TryInvokeOnMainThread(() =>
                 {
-                    ZNet.instance.Save(false, true, false);
+                    nativeSaveTriggered = TryTriggerNativeSaveLikeMenuButton(out saveTriggerRoute);
                 }, timeoutMs: 3000);
 
-                if (!saveTriggered)
+                if (!saveTriggerInvoked || !nativeSaveTriggered)
                 {
-                    SimpleBackupPlugin.Log.LogWarning("Failed to trigger ZNet save on main thread.");
+                    SimpleBackupPlugin.Log.LogWarning("Failed to trigger native Save-button flow before backup.");
                     return false;
                 }
 
-                SimpleBackupPlugin.Log.LogDebug("Triggered native save via ZNet.Save(sync:false, saveOtherPlayerProfiles:true, waitForNextFrame:false).");
+                SimpleBackupPlugin.Log.LogDebug($"Triggered native save via {saveTriggerRoute}.");
 
                 var timeoutAt = DateTime.UtcNow.AddMilliseconds(SaveSyncTimeoutMs);
+                bool sawSaveStart = false;
                 while (DateTime.UtcNow < timeoutAt)
                 {
+                    float currentStartTime = baselineStartTime;
                     float currentDoneTime = baselineDoneTime;
-                    bool readDoneTime = SimpleBackupPlugin.TryInvokeOnMainThread(() =>
+                    bool readTimes = SimpleBackupPlugin.TryInvokeOnMainThread(() =>
                     {
+                        currentStartTime = ZNet.instance.SaveStartTime;
                         currentDoneTime = ZNet.instance.SaveDoneTime;
                     }, timeoutMs: 3000);
 
-                    if (!readDoneTime)
+                    if (!readTimes)
                     {
                         SimpleBackupPlugin.Log.LogWarning("Could not read save completion timestamp from ZNet.");
                         return false;
                     }
 
-                    if (currentDoneTime > baselineDoneTime)
+                    if (!sawSaveStart && currentStartTime > baselineStartTime)
+                    {
+                        sawSaveStart = true;
+                    }
+
+                    if (sawSaveStart && currentDoneTime > baselineDoneTime && currentDoneTime >= currentStartTime)
                     {
                         Thread.Sleep(SaveSettleDelayMs);
+                        if (!WaitForProbeWrites(probes))
+                        {
+                            SimpleBackupPlugin.Log.LogWarning("Save synchronization completed but file writes were not confirmed in time.");
+                            return false;
+                        }
                         return true;
                     }
 
@@ -212,6 +242,166 @@ namespace SimpleBackup
                 SimpleBackupPlugin.Log.LogWarning($"Failed while syncing live save state before backup: {ex.Message}");
                 return false;
             }
+        }
+
+        private static List<SaveWriteProbe> CollectSaveWriteProbes(string targetWorld, string targetCharacter)
+        {
+            var probes = new List<SaveWriteProbe>();
+
+            if (!string.IsNullOrEmpty(targetWorld))
+            {
+                TryAddSaveWriteProbe(targetWorld, SaveDataType.World, "world", probes);
+            }
+
+            if (!string.IsNullOrEmpty(targetCharacter))
+            {
+                TryAddSaveWriteProbe(targetCharacter, SaveDataType.Character, "character", probes);
+            }
+
+            return probes;
+        }
+
+        private static bool TryTriggerNativeSaveLikeMenuButton(out string triggerRoute)
+        {
+            triggerRoute = "unknown route";
+
+            Menu menu = UnityEngine.Object.FindAnyObjectByType<Menu>();
+            if (menu == null)
+            {
+                triggerRoute = "menu unavailable";
+                return false;
+            }
+
+            MethodInfo onManualSave = AccessTools.Method(typeof(Menu), "OnManualSave", Type.EmptyTypes);
+            if (onManualSave != null)
+            {
+                try
+                {
+                    onManualSave.Invoke(menu, null);
+                    triggerRoute = "Menu.OnManualSave()";
+                    return true;
+                }
+                catch (Exception ex)
+                {
+                    SimpleBackupPlugin.Log.LogWarning($"Native save method 'OnManualSave' failed: {ex.Message}");
+                }
+            }
+
+            Button saveButton = FindNativeSaveButton(menu);
+            if (saveButton != null)
+            {
+                saveButton.onClick.Invoke();
+                triggerRoute = "Menu Save button onClick";
+                return true;
+            }
+
+            triggerRoute = "no native save method or button found";
+            return false;
+        }
+
+        private static Button FindNativeSaveButton(Menu menu)
+        {
+            if (menu == null || menu.m_menuDialog == null)
+            {
+                return null;
+            }
+
+            Transform root = menu.m_menuDialog.transform;
+            Transform menuEntries = root.Find("MenuEntries")
+                ?? root.Find("menu")
+                ?? root.Find("MENU")
+                ?? root.Find("MenuContainer")
+                ?? root;
+
+            foreach (Button button in menuEntries.GetComponentsInChildren<Button>(true))
+            {
+                if (button == null)
+                {
+                    continue;
+                }
+
+                if (string.Equals(button.name, "Save", StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(button.name, "ButtonSave", StringComparison.OrdinalIgnoreCase))
+                {
+                    return button;
+                }
+
+                TMP_Text text = button.GetComponentInChildren<TMP_Text>(true);
+                string label = text != null && text.text != null ? text.text.Trim() : string.Empty;
+                if (string.Equals(label, "Save", StringComparison.OrdinalIgnoreCase))
+                {
+                    return button;
+                }
+            }
+
+            return null;
+        }
+
+        private static void TryAddSaveWriteProbe(string saveName, SaveDataType saveDataType, string labelPrefix, List<SaveWriteProbe> probes)
+        {
+            try
+            {
+                SaveWithBackups save;
+                if (!SaveSystem.TryGetSaveByName(saveName, saveDataType, out save) || save == null || save.PrimaryFile == null)
+                {
+                    return;
+                }
+
+                string path = save.PrimaryFile.PathPrimary;
+                if (string.IsNullOrEmpty(path) || !File.Exists(path))
+                {
+                    return;
+                }
+
+                probes.Add(new SaveWriteProbe
+                {
+                    Label = $"{labelPrefix} '{saveName}'",
+                    Path = path,
+                    BaselineWriteUtc = File.GetLastWriteTimeUtc(path)
+                });
+            }
+            catch (Exception ex)
+            {
+                SimpleBackupPlugin.Log.LogDebug($"Failed to collect save write probe for {labelPrefix} '{saveName}': {ex.Message}");
+            }
+        }
+
+        private static bool WaitForProbeWrites(List<SaveWriteProbe> probes)
+        {
+            if (probes == null || probes.Count == 0)
+            {
+                return true;
+            }
+
+            var timeoutAt = DateTime.UtcNow.AddMilliseconds(SaveWriteConfirmationTimeoutMs);
+            while (DateTime.UtcNow < timeoutAt)
+            {
+                bool allUpdated = true;
+                foreach (SaveWriteProbe probe in probes)
+                {
+                    if (!File.Exists(probe.Path))
+                    {
+                        allUpdated = false;
+                        break;
+                    }
+
+                    DateTime currentWrite = File.GetLastWriteTimeUtc(probe.Path);
+                    if (currentWrite <= probe.BaselineWriteUtc)
+                    {
+                        allUpdated = false;
+                        break;
+                    }
+                }
+
+                if (allUpdated)
+                {
+                    return true;
+                }
+
+                Thread.Sleep(SavePollIntervalMs);
+            }
+
+            return false;
         }
 
         private static bool TryCreateNativeBackup(string saveName, SaveDataType saveDataType)

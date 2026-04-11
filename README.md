@@ -1,6 +1,6 @@
-# SimpleBackup
+# SimpleBackup beta 0.1.0
 
-SimpleBackup is a Valheim backup plugin that adds fast in-game backup triggers on top of Valheim's native backup system.
+SimpleBackup beta 0.1.0 is a Valheim backup plugin that adds fast in-game backup triggers on top of Valheim's native backup system.
 
 ## Ground Truth (Current Build)
 

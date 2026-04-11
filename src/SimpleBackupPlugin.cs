@@ -16,7 +16,7 @@ namespace SimpleBackup
     {
         public const string PluginGUID = "com.aloncifer.simplebackup";
         public const string PluginName = "SimpleBackup";
-        public const string PluginVersion = "0.0.3";
+        public const string PluginVersion = "0.1.0";
 
         private Harmony _harmony;
         public static SimpleBackupPlugin Instance;
