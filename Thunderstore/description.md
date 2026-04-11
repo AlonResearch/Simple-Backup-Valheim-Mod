@@ -36,7 +36,7 @@ This plugin generates a BepInEx config (`com.aloncifer.simplebackup.cfg`) where 
 
 **Explanation of the config:**
 * **BackupIntervalMinutes** - the time (in minutes) between automatic background backups. Set to `0` to disable auto-backup entirely. Default: `0`
-* **MaxBackupsToKeep** - the number of total Backups you want to keep per distinct profile. If you want to keep only the 5 latest backups you must set this to `5`. Older backups are permanently deleted to save storage space! Default: `5`
+* **MaxBackupsPerSave** - the number of native backups you want to keep per save. If you want to keep only the 5 latest backups you must set this to `5`. Older backups are pruned automatically after each successful backup. Default: `5`
 
 <details>
 <summary><b>Click to see the literal config generation!</b></summary>
@@ -46,8 +46,8 @@ This plugin generates a BepInEx config (`com.aloncifer.simplebackup.cfg`) where 
 # Time in minutes between automatic background backups. Set to 0 to disable auto-backup entirely.
 BackupIntervalMinutes = 0
 
-# Maximum amount of .zip files retained per distinct world / character. Older files are deleted safely.
-MaxBackupsToKeep = 5
+# Maximum amount of native backups retained per save. Older files are pruned automatically.
+MaxBackupsPerSave = 5
 ```
 </details>
 

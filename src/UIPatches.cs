@@ -7,6 +7,32 @@ using TMPro;
 
 namespace SimpleBackup
 {
+    public sealed class BackupButtonStateController : MonoBehaviour
+    {
+        private Button _button;
+
+        public void Initialize(Button button)
+        {
+            _button = button;
+            RefreshState();
+        }
+
+        private void Update()
+        {
+            RefreshState();
+        }
+
+        private void RefreshState()
+        {
+            if (_button == null)
+            {
+                return;
+            }
+
+            _button.interactable = !BackupCoordinator.IsBackupInProgress && !BackupCoordinator.IsCooldownActive;
+        }
+    }
+
     [HarmonyPatch(typeof(Menu))]
     public static class MenuPatch
     {
@@ -64,23 +90,19 @@ namespace SimpleBackup
                         btn.onClick.AddListener(() =>
                         {
                             string wName = (ZNet.instance != null && ZNet.instance.IsServer()) ? ZNet.instance.GetWorldName() : null;
-                            string cName = Player.m_localPlayer != null ? Player.m_localPlayer.GetPlayerName() : null;
+                            string cName = BackupManager.GetCurrentCharacterSaveName();
 
                             BackupCoordinator.BackupStartResult startResult = BackupCoordinator.TryStartBackup(wName, cName);
                             if (startResult == BackupCoordinator.BackupStartResult.Started)
                             {
-                                SimpleBackupPlugin.Log.LogInfo($"Manual UI Backup Triggered! Target: {wName}/{cName}");
-                                if (MessageHud.instance != null)
-                                {
-                                    MessageHud.instance.ShowMessage(MessageHud.MessageType.Center, "Session Backup Started in Background!");
-                                }
+                                SimpleBackupPlugin.Log.LogDebug($"Manual UI backup triggered for world='{wName}', character='{cName}'.");
                             }
-                            else if (MessageHud.instance != null)
+                            else
                             {
                                 string message = startResult == BackupCoordinator.BackupStartResult.CooldownActive
-                                    ? "Backup cooldown active. Please wait 2 seconds before starting another backup."
+                                    ? "Backup on cooldown."
                                     : "Backup already running.";
-                                MessageHud.instance.ShowMessage(MessageHud.MessageType.Center, message);
+                                SimpleBackupPlugin.QueueUIMessage(message);
                             }
                         });
 
@@ -89,6 +111,9 @@ namespace SimpleBackup
                         {
                             btn.navigation = templateButton.navigation;
                         }
+
+                        BackupButtonStateController stateController = backupButtonObj.AddComponent<BackupButtonStateController>();
+                        stateController.Initialize(btn);
                     }
                 }
             }

@@ -1,62 +1,99 @@
-# 🛡️ SimpleBackup: Technical Ground Truth
+# SimpleBackup beta 0.1.0
 
-**SimpleBackup** is a performance-first, host-aware backup engine for Valheim. This document serves as the definitive technical specification and operational logic for the mod, intended as the primary source of truth for maintainers and automated agents.
+SimpleBackup beta 0.1.0 is a Valheim backup plugin that adds fast in-game backup triggers on top of Valheim's native backup system.
 
----
+## Ground Truth (Current Build)
 
-## 🏗️ Core Architecture
+SimpleBackup currently provides:
 
-SimpleBackup operates as a **BepInEx 5** plugin using **Harmony** for runtime UI injection. It is designed to be completely decoupled from large modding frameworks like Jotunn to ensure maximum compatibility and zero dependency bloat.
+1. Esc-menu Backup button integrated under Save.
+2. Console commands: `sb.backup`, `sb.backup world`, `sb.backup char`, `sb.list`.
+3. Automatic timed backups (optional) via config.
+4. Native backup creation through Valheim save APIs.
+5. Save-before-backup synchronization through current-version ZNet save flow.
+6. Single-flight execution with cooldown guard.
+7. Minimalist UX messaging with duration in completion/failure toasts.
+8. Flashing top-right backup indicator while backup is running.
 
-### 1. Context-Aware Target Logic
-The mod intelligently isolates backup targets based on the current game state:
-- **Host Check**: Determined via `ZNet.instance.IsServer()`.
-- **Target Extraction**:
-    - **World Name**: `ZNet.instance.GetWorldName()` (only if Host).
-    - **Character Name**: `Player.m_localPlayer.GetPlayerName()`.
-- **Ground Truth**: If the player is a client on a dedicated server, `PerformFullBackup` is invoked with a `null` world parameter, ensuring only the local character profile is secured.
+## Backup Pipeline
 
-### 2. File Topology & Path Resolution
-Valheim save data is highly fragmented due to Steam Cloud and legacy updates. SimpleBackup sweeps three distinct layers:
-- **Registry Engine (Windows Only)**: Accesses `HKEY_LOCAL_MACHINE\SOFTWARE\WOW6432Node\Valve\Steam` to locate the local Steam installation. It then iterates through all `userdata` folders to find AppID `892970` (Valheim) remote saves.
-- **LocalLow Engine**: Probes `%USERPROFILE%\AppData\LocalLow\IronGate\Valheim\` for `worlds`, `worlds_local`, `characters`, and `characters_local`.
-- **Ground Truth**: Backups are archived in a dedicated central directory: `%USERPROFILE%\AppData\LocalLow\IronGate\Valheim\SimpleBackup`. This directory is outside the standard save paths to prevent Steam Cloud from attempting to sync large `.zip` archives.
+Every trigger path (button, command, timer) follows the same pipeline:
 
-### 3. Concurrency & Main-Thread Safety
-Unity is single-threaded for most engine operations. SimpleBackup enforces strict concurrency rules to prevent game lag:
-- **Asynchronous I/O**: All compression and disk operations (`ZipFile.CreateEntryFromFile`) MUST run via `System.Threading.Tasks.Task.Run()`.
-- **Cross-Thread UI Messaging**: Since background tasks cannot touch Unity UI (like `MessageHud`), SimpleBackup utilizes a `ConcurrentQueue<string>` system.
-    - Background tasks push messages to the queue.
-    - The `Update()` loop on the main thread polls `TryDequeue` and safely invokes `MessageHud.instance.ShowMessage`.
+1. Resolve requested target intent.
+2. Enter coordinator gate (no overlap, 5-second cooldown).
+3. Trigger native save sync via `ZNet.Save(false, true, false)` on main thread.
+4. Wait for `ZNet.SaveDoneTime` to advance.
+5. Create native backup(s) for selected target(s).
+6. Emit concise completion/failure toast with elapsed time.
 
-### 4. Console System & Resilience
-To ensure commands are always available even when other mods (like Jotunn) attempt to wipe the terminal dictionary:
-- **Reflection Injection**: Uses `System.Reflection` to access the private `Terminal.commands` dictionary.
-- **Failsafe Registration**: The `Update()` loop performs a heartbeat check every 2.0 seconds. If `sb.backup` is missing from the dictionary, the mod force-re-registers all `sb.*` commands.
-- **Restoration Safety**: `sb.restore` is hard-locked to the **Main Menu** (`ZNet.instance == null`) to prevent fatal race conditions while game databases are open.
+Important behavior details:
 
-### 5. Data Integrity: The `.old` Strategy
-During restoration, SimpleBackup never immediately overwrites active saves:
-1. Current `.db`/`.fwl`/`.fch` files are renamed with a `.old` suffix.
-2. The archive is extracted cleanly into the source directory.
-3. This ensures that even a failed restore does not result in data loss.
+1. Explicit target commands are strict.
+2. `sb.backup world` will not silently fall back to character.
+3. `sb.backup char` will not silently fall back to world.
+4. Backup sync is current-version only and does not use legacy trigger discovery fallbacks.
+5. If save completion cannot be confirmed within timeout, backup is canceled to avoid stale snapshots.
 
----
+## User Experience
 
-## 🛠️ Ground Truth Feature Set
+Design goals are minimal and informative:
 
-| Feature | Implementation Detail |
-| :--- | :--- |
-| **Manual Trigger** | Cloned "Settings" button in Esc Menu, positioned via `SetSiblingIndex`. |
-| **Auto-Backup** | Background timer configurable via `.cfg`. |
-| **Metrics** | Tracks total bytes and duration using `Stopwatch` and `FileInfo`. |
-| **Retention** | `MaxBackupsToKeep` config determines how many zips are kept per character/world. |
-| **Commands** | `sb.backup` (manual sync), `sb.list` (history), `sb.restore` (safety extraction). |
+1. No center-screen backup spam.
+2. Flashing top-right backup badge while backup is running.
+3. Backup button is grayed out while backup is running or cooldown is active.
+4. Concise top-left toast on completion/failure/cancel with timing.
 
----
+Examples:
 
-## 📥 Installation Logic
-- **Mod Manager**: Primary channel. The `.zip` contains a standard `manifest.json`, `icon.png`, and the `plugins/SimpleBackup.dll`.
-- **Manual**: Direct drop of `SimpleBackup.dll` into `BepInEx/plugins`.
+1. `Backup complete (1.8s): world 'MyWorld' and character 'test'.`
+2. `Backup failed (1.2s): requested target unavailable.`
+3. `Backup canceled (2.0s): could not confirm current save state.`
+4. `Backup on cooldown.`
+5. `Backup already running.`
 
-*Developed by Aloncifer.*
+## Target Rules
+
+1. Hosted local world:
+1. `sb.backup world` backs up world.
+2. `sb.backup char` backs up character.
+3. Esc button and `sb.backup` attempt both.
+2. Non-host/client session:
+1. `sb.backup world` is blocked.
+2. Character backup paths remain available when character save is resolvable.
+
+## Commands
+
+1. `sb.backup` - backup current available targets.
+2. `sb.backup world` - world only (host required).
+3. `sb.backup char` - character only.
+4. `sb.list` - lists legacy archive index entries.
+
+Cooldown behavior:
+
+1. Backup actions use a 5-second cooldown window.
+2. During cooldown, the Esc-menu `Backup` button remains disabled (grayed out).
+
+## Configuration
+
+Config file: `com.aloncifer.simplebackup.cfg`
+
+1. `BackupIntervalMinutes`: timed backup interval. `0` disables scheduler.
+2. `MaxBackupsPerSave`: maximum number of native backups kept per save target.
+
+Retention behavior:
+
+1. Native backups are pruned after each successful backup so only the newest `MaxBackupsPerSave` entries remain per save.
+2. Setting the value to `0` disables pruning.
+
+## Build and Install
+
+1. Build target: .NET Framework 4.6.2.
+2. Build command: `dotnet build SimpleBackup.sln -c Release`.
+3. Output: `src/bin/Release/net462/SimpleBackup.dll`.
+4. Install DLL to BepInEx plugins folder.
+
+## Notes
+
+1. The backup badge uses IMGUI; icon glyph rendering can vary by system font.
+2. Native restore/list rendering is still Valheim-owned UI behavior.
+3. This build targets current Valheim save APIs and intentionally removes legacy trigger compatibility paths.

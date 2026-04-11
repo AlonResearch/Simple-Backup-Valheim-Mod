@@ -13,12 +13,13 @@ namespace SimpleBackup
             CooldownActive
         }
 
-        private const int MinimumBackupIntervalSeconds = 2;
+        private const int MinimumBackupIntervalSeconds = 5;
         private static readonly object _backupGate = new object();
         private static int _backupInProgress;
         private static long _lastBackupStartTicks;
 
         public static bool IsBackupInProgress => Volatile.Read(ref _backupInProgress) == 1;
+        public static bool IsCooldownActive => IsWithinCooldown(DateTime.UtcNow.Ticks);
 
         public static BackupStartResult TryStartBackup(string targetWorld, string targetCharacter)
         {

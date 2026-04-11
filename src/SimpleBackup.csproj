@@ -3,7 +3,7 @@
     <TargetFramework>net462</TargetFramework>
     <AssemblyName>SimpleBackup</AssemblyName>
     <Description>Valheim Simple Backup Mod</Description>
-    <Version>0.0.2</Version>
+    <Version>0.1.0</Version>
     <ValheimInstallPath>C:\Program Files (x86)\Steam\steamapps\common\Valheim</ValheimInstallPath>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <LangVersion>latest</LangVersion>
@@ -55,6 +55,9 @@
     </Reference>
     <Reference Include="UnityEngine.TextRenderingModule">
       <HintPath>$(ValheimInstallPath)\valheim_Data\Managed\UnityEngine.TextRenderingModule.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine.IMGUIModule">
+      <HintPath>$(ValheimInstallPath)\valheim_Data\Managed\UnityEngine.IMGUIModule.dll</HintPath>
     </Reference>
     <Reference Include="Unity.TextMeshPro">
       <HintPath>$(ValheimInstallPath)\valheim_Data\Managed\Unity.TextMeshPro.dll</HintPath>
