@@ -1,6 +1,7 @@
 {
     "name": "NativeBackup",
     "version_number": "0.1.1",
+    "author": "Aloncifer",
     "website_url": "https://github.com/AlonResearch/NativeBackup-Valheim-Mod",
     "description": "A simple backup valheim mod",
     "dependencies": [
