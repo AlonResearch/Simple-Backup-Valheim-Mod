@@ -5,7 +5,7 @@ using System.Linq;
 using HarmonyLib;
 using System.Collections.Generic;
 
-namespace SimpleBackup
+namespace NativeBackup
 {
     public static class RestoreCommandLogic
     {
@@ -60,7 +60,7 @@ namespace SimpleBackup
 
             if (injected)
             {
-                SimpleBackupPlugin.Log.LogInfo("sb. Commands forcefully registered into Terminal dictionary.");
+                NativeBackupPlugin.Log.LogInfo("sb. Commands forcefully registered into Terminal dictionary.");
             }
         }
 
@@ -239,7 +239,7 @@ namespace SimpleBackup
             catch (Exception ex)
             {
                 Emit(reportMessage, $"Error during restore: {ex.Message}");
-                SimpleBackupPlugin.Log.LogError(ex);
+                NativeBackupPlugin.Log.LogError(ex);
                 return false;
             }
         }
@@ -262,7 +262,7 @@ namespace SimpleBackup
             }
             else
             {
-                SimpleBackupPlugin.Log.LogInfo(message);
+                NativeBackupPlugin.Log.LogInfo(message);
             }
         }
 
@@ -281,3 +281,4 @@ namespace SimpleBackup
         }
     }
 }
+

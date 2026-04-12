@@ -1,4 +1,4 @@
-# TESTING GUIDE: SimpleBackup beta 0.1.0 (Current Ground Truth)
+# TESTING GUIDE: NativeBackup beta 0.1.1 (Current Ground Truth)
 
 This test plan validates all currently implemented backup features, including current-version save-sync reliability, strict target behavior, indicator UX, duration toasts, retention pruning, and button cooldown states.
 
@@ -6,14 +6,14 @@ This test plan validates all currently implemented backup features, including cu
 
 1. Valheim installed and launchable.
 2. BepInEx 5 installed.
-3. Latest `SimpleBackup.dll` in BepInEx plugins.
+3. Latest `NativeBackup.dll` in BepInEx plugins.
 4. At least one character exists.
 5. At least one local world exists for host tests.
 
 ## 2. Build Verification
 
-1. Run `dotnet build SimpleBackup.sln -c Release`.
-2. Confirm output file exists at `src/bin/Release/net462/SimpleBackup.dll`.
+1. Run `dotnet build NativeBackup.sln -c Release`.
+2. Confirm output file exists at `src/bin/Release/net462/NativeBackup.dll`.
 
 Expected:
 

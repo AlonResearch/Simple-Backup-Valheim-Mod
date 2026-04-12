@@ -2,7 +2,7 @@ using System;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace SimpleBackup
+namespace NativeBackup
 {
     public static class BackupCoordinator
     {
@@ -49,8 +49,8 @@ namespace SimpleBackup
                 }
                 catch (Exception ex)
                 {
-                    SimpleBackupPlugin.Log?.LogError(ex);
-                    SimpleBackupPlugin.QueueUIMessage("Backup failed unexpectedly.");
+                    NativeBackupPlugin.Log?.LogError(ex);
+                    NativeBackupPlugin.QueueUIMessage("Backup failed unexpectedly.");
                 }
                 finally
                 {

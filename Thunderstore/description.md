@@ -1,7 +1,9 @@
 <div align="center">
-  <h1>🛡️ SimpleBackup 0.0.1 ALPHA MVP</h1>
+  <h1>🛡️ NativeBackup 0.1.1 BETA</h1>
   <b>The rock-solid 1-click backup solution for Valheim!</b>
 </div>
+
+<p><b>A simple backup valheim mod</b></p>
 
 **Native Major Version:** Valheim 0.217+  
 **Source Code:** [GitHub Repository](https://github.com/AlonResearch/Simple-Backup-Valheim-Mod)  
@@ -10,8 +12,14 @@
 
 ________________________________________________
 
+### ⚠️ IMPORTANT SAFETY WARNING
+Do not quit, log out, or close the game while a save or backup is in progress.
+Always wait until you see the top-left completion or fail message before exiting.
+
+________________________________________________
+
 ### 🚀 OVERVIEW: Dynamic Host-Aware Backups
-First of all, you can save massive amounts of disk space! SimpleBackup is designed intelligently: If you are hosting a local world, it detects this natively and secures both your World and Character. If you are just a client visiting someone else's server, it automatically calculates the connection and *only* secures your local Character profile! 
+First of all, you can save massive amounts of disk space! NativeBackup is designed intelligently: If you are hosting a local world, it detects this natively and secures both your World and Character. If you are just a client visiting someone else's server, it automatically calculates the connection and *only* secures your local Character profile! 
 
 ________________________________________________
 
@@ -27,12 +35,12 @@ ________________________________________________
 ### ⚙️ How to use:
 1. Open the **Esc Menu** while playing.
 2. Click **Backup**.
-3. Check your `BepInEx/plugins/SimpleBackup/Backups` folder for your new `.zip`!
+3. Check your backups from the native Valheim save manager and local save folders.
 
 ________________________________________________
 
 ### 🔧 Config:
-This plugin generates a BepInEx config (`com.aloncifer.simplebackup.cfg`) where you can heavily tailor your experience.
+This plugin generates a BepInEx config (`com.aloncifer.nativebackup.cfg`) where you can heavily tailor your experience.
 
 **Explanation of the config:**
 * **BackupIntervalMinutes** - the time (in minutes) between automatic background backups. Set to `0` to disable auto-backup entirely. Default: `0`
@@ -56,12 +64,12 @@ ________________________________________________
 ### 📥 Installation 
 
 1. Ensure you have the core framework **BepInExPack Valheim** installed.
-2. Download the `Aloncifer-SimpleBackup-0.0.1.zip` file.
+2. Download the `NativeBackup-0.1.1.zip` file.
 3. Open **r2modman** (or Thunderstore Mod Manager) and your Valheim profile.
 4. Go to **Settings** -> **Import local mod** and select the `.zip` file.
-Alternatively, you can manually drop `SimpleBackup.dll` into your `Valheim/BepInEx/plugins/` folder.
+Alternatively, you can manually drop `NativeBackup.dll` into your `Valheim/BepInEx/plugins/` folder.
 4. Boot Valheim once to automatically render the configuration file!
 
 ________________________________________________
 
-*Created with native performance in mind by Aloncifer.*
+*Created with native performance in mind by Aloncifer. NativeBackup: A simple backup valheim mod.*

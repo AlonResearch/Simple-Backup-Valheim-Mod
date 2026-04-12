@@ -1,10 +1,10 @@
 $ErrorActionPreference = 'Stop'
 
 Write-Host "Cleaning up old assemblies..." -ForegroundColor Cyan
-if (Test-Path "src\bin\Release\net462\SimpleBackup.dll") { Remove-Item -Force "src\bin\Release\net462\SimpleBackup.dll" }
-if (Test-Path "src\bin\Debug\net462\SimpleBackup.dll") { Remove-Item -Force "src\bin\Debug\net462\SimpleBackup.dll" }
+if (Test-Path "src\bin\Release\net462\NativeBackup.dll") { Remove-Item -Force "src\bin\Release\net462\NativeBackup.dll" }
+if (Test-Path "src\bin\Debug\net462\NativeBackup.dll") { Remove-Item -Force "src\bin\Debug\net462\NativeBackup.dll" }
 
-Write-Host "Building SimpleBackup..." -ForegroundColor Cyan
+Write-Host "Building NativeBackup..." -ForegroundColor Cyan
 dotnet build -c Release
 if ($LASTEXITCODE -ne 0) {
     dotnet build
@@ -26,8 +26,8 @@ if (Test-Path $TempDir) {
 New-Item -ItemType Directory -Force -Path $TempDir | Out-Null
 
 Write-Host "Gathering Artifacts..." -ForegroundColor Cyan
-$ReleaseDll = "src\bin\Release\net462\SimpleBackup.dll"
-$DebugDll = "src\bin\Debug\net462\SimpleBackup.dll"
+$ReleaseDll = "src\bin\Release\net462\NativeBackup.dll"
+$DebugDll = "src\bin\Debug\net462\NativeBackup.dll"
 
 if (Test-Path $ReleaseDll) {
     Write-Host "   -> Found Release DLL"

@@ -1,10 +1,10 @@
-# SimpleBackup beta 0.1.0
+# NativeBackup beta 0.1.1
 
-SimpleBackup beta 0.1.0 is a Valheim backup plugin that adds fast in-game backup triggers on top of Valheim's native backup system.
+NativeBackup beta 0.1.1 is a Valheim backup plugin that adds fast in-game backup triggers on top of Valheim's native backup system.
 
 ## Ground Truth (Current Build)
 
-SimpleBackup currently provides:
+NativeBackup currently provides:
 
 1. Esc-menu Backup button integrated under Save.
 2. Console commands: `sb.backup`, `sb.backup world`, `sb.backup char`, `sb.list`.
@@ -75,7 +75,7 @@ Cooldown behavior:
 
 ## Configuration
 
-Config file: `com.aloncifer.simplebackup.cfg`
+Config file: `com.aloncifer.nativebackup.cfg`
 
 1. `BackupIntervalMinutes`: timed backup interval. `0` disables scheduler.
 2. `MaxBackupsPerSave`: maximum number of native backups kept per save target.
@@ -88,8 +88,8 @@ Retention behavior:
 ## Build and Install
 
 1. Build target: .NET Framework 4.6.2.
-2. Build command: `dotnet build SimpleBackup.sln -c Release`.
-3. Output: `src/bin/Release/net462/SimpleBackup.dll`.
+2. Build command: `dotnet build NativeBackup.sln -c Release`.
+3. Output: `src/bin/Release/net462/NativeBackup.dll`.
 4. Install DLL to BepInEx plugins folder.
 
 ## Notes

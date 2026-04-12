@@ -1,9 +1,9 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <TargetFramework>net462</TargetFramework>
-    <AssemblyName>SimpleBackup</AssemblyName>
-    <Description>Valheim Simple Backup Mod</Description>
-    <Version>0.1.0</Version>
+    <AssemblyName>NativeBackup</AssemblyName>
+    <Description>A simple backup valheim mod</Description>
+    <Version>0.1.1</Version>
     <ValheimInstallPath>C:\Program Files (x86)\Steam\steamapps\common\Valheim</ValheimInstallPath>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <LangVersion>latest</LangVersion>

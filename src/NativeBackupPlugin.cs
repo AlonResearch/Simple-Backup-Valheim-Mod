@@ -9,17 +9,17 @@ using System;
 using System.Threading;
 using System.Collections.Generic;
 
-namespace SimpleBackup
+namespace NativeBackup
 {
     [BepInPlugin(PluginGUID, PluginName, PluginVersion)]
-    public class SimpleBackupPlugin : BaseUnityPlugin
+    public class NativeBackupPlugin : BaseUnityPlugin
     {
-        public const string PluginGUID = "com.aloncifer.simplebackup";
-        public const string PluginName = "SimpleBackup";
-        public const string PluginVersion = "0.1.0";
+        public const string PluginGUID = "com.aloncifer.nativebackup";
+        public const string PluginName = "NativeBackup";
+        public const string PluginVersion = "0.1.1";
 
         private Harmony _harmony;
-        public static SimpleBackupPlugin Instance;
+        public static NativeBackupPlugin Instance;
         private static readonly ConcurrentQueue<string> _uiMessageQueue = new ConcurrentQueue<string>();
         private static readonly ConcurrentQueue<Action> _mainThreadActions = new ConcurrentQueue<Action>();
         private static int _backupIndicatorActive;
@@ -209,3 +209,4 @@ namespace SimpleBackup
         }
     }
 }
+

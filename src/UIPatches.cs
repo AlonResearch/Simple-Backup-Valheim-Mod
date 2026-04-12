@@ -5,7 +5,7 @@ using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
 
-namespace SimpleBackup
+namespace NativeBackup
 {
     public sealed class BackupButtonStateController : MonoBehaviour
     {
@@ -58,7 +58,7 @@ namespace SimpleBackup
 
                 if (settingsTemplate != null)
                 {
-                    SimpleBackupPlugin.Log.LogInfo("Injecting Backup button under Save.");
+                    NativeBackupPlugin.Log.LogInfo("Injecting Backup button under Save.");
 
                     GameObject backupButtonObj = GameObject.Instantiate(settingsTemplate.gameObject, menuEntries);
                     backupButtonObj.name = "BackupGame";
@@ -95,14 +95,14 @@ namespace SimpleBackup
                             BackupCoordinator.BackupStartResult startResult = BackupCoordinator.TryStartBackup(wName, cName);
                             if (startResult == BackupCoordinator.BackupStartResult.Started)
                             {
-                                SimpleBackupPlugin.Log.LogDebug($"Manual UI backup triggered for world='{wName}', character='{cName}'.");
+                                NativeBackupPlugin.Log.LogDebug($"Manual UI backup triggered for world='{wName}', character='{cName}'.");
                             }
                             else
                             {
                                 string message = startResult == BackupCoordinator.BackupStartResult.CooldownActive
                                     ? "Backup on cooldown."
                                     : "Backup already running.";
-                                SimpleBackupPlugin.QueueUIMessage(message);
+                                NativeBackupPlugin.QueueUIMessage(message);
                             }
                         });
 
@@ -148,3 +148,4 @@ namespace SimpleBackup
         }
     }
 }
+

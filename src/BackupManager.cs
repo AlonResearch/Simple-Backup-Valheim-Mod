@@ -13,7 +13,7 @@ using System.Diagnostics;
 using TMPro;
 using HarmonyLib;
 
-namespace SimpleBackup
+namespace NativeBackup
 {
     public static class BackupManager
     {
@@ -50,7 +50,7 @@ namespace SimpleBackup
         public static string GetBackupRootDirectory()
         {
             string localLow = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData) + "Low";
-            string path = Path.Combine(localLow, "IronGate", "Valheim", "SimpleBackup");
+            string path = Path.Combine(localLow, "IronGate", "Valheim", "NativeBackup");
             if (!Directory.Exists(path)) Directory.CreateDirectory(path);
             return path;
         }
@@ -68,21 +68,21 @@ namespace SimpleBackup
             if (ZNet.instance == null)
             {
                 string message = "Backup unavailable in this scene.";
-                SimpleBackupPlugin.QueueUIMessage(message);
-                SimpleBackupPlugin.Log.LogWarning(message);
+                NativeBackupPlugin.QueueUIMessage(message);
+                NativeBackupPlugin.Log.LogWarning(message);
                 return;
             }
 
             var duration = Stopwatch.StartNew();
-            SimpleBackupPlugin.SetBackupIndicatorActive(true);
+            NativeBackupPlugin.SetBackupIndicatorActive(true);
             try
             {
                 bool syncSuccessful = TrySyncLiveStateBeforeBackup(targetWorld, targetCharacter);
                 if (!syncSuccessful)
                 {
                     string msg = $"Backup canceled ({duration.Elapsed.TotalSeconds:0.0}s): could not confirm current save state.";
-                    SimpleBackupPlugin.QueueUIMessage(msg);
-                    SimpleBackupPlugin.Log.LogWarning(msg);
+                    NativeBackupPlugin.QueueUIMessage(msg);
+                    NativeBackupPlugin.Log.LogWarning(msg);
                     return;
                 }
 
@@ -132,20 +132,20 @@ namespace SimpleBackup
                 {
                     string scope = string.Join(" and ", backupItems.Distinct().ToArray());
                     string msg = $"Backup complete ({duration.Elapsed.TotalSeconds:0.0}s): {scope}.";
-                    SimpleBackupPlugin.QueueUIMessage(msg);
-                    SimpleBackupPlugin.Log.LogInfo(msg);
+                    NativeBackupPlugin.QueueUIMessage(msg);
+                    NativeBackupPlugin.Log.LogInfo(msg);
                 }
                 else
                 {
                     string reason = explicitTargetsRequested ? "requested target unavailable" : "no eligible save target found";
                     string msg = $"Backup failed ({duration.Elapsed.TotalSeconds:0.0}s): {reason}.";
-                    SimpleBackupPlugin.QueueUIMessage(msg);
-                    SimpleBackupPlugin.Log.LogWarning(msg);
+                    NativeBackupPlugin.QueueUIMessage(msg);
+                    NativeBackupPlugin.Log.LogWarning(msg);
                 }
             }
             finally
             {
-                SimpleBackupPlugin.SetBackupIndicatorActive(false);
+                NativeBackupPlugin.SetBackupIndicatorActive(false);
             }
         }
 
@@ -162,7 +162,7 @@ namespace SimpleBackup
             {
                 if (ZNet.instance == null)
                 {
-                    SimpleBackupPlugin.Log.LogWarning("Could not sync save because ZNet is unavailable.");
+                    NativeBackupPlugin.Log.LogWarning("Could not sync save because ZNet is unavailable.");
                     return false;
                 }
 
@@ -170,7 +170,7 @@ namespace SimpleBackup
 
                 float baselineStartTime = 0f;
                 float baselineDoneTime = 0f;
-                bool baselineRead = SimpleBackupPlugin.TryInvokeOnMainThread(() =>
+                bool baselineRead = NativeBackupPlugin.TryInvokeOnMainThread(() =>
                 {
                     baselineStartTime = ZNet.instance.SaveStartTime;
                     baselineDoneTime = ZNet.instance.SaveDoneTime;
@@ -178,24 +178,24 @@ namespace SimpleBackup
 
                 if (!baselineRead)
                 {
-                    SimpleBackupPlugin.Log.LogWarning("Could not read baseline save timestamp before triggering save.");
+                    NativeBackupPlugin.Log.LogWarning("Could not read baseline save timestamp before triggering save.");
                     return false;
                 }
 
                 string saveTriggerRoute = null;
                 bool nativeSaveTriggered = false;
-                bool saveTriggerInvoked = SimpleBackupPlugin.TryInvokeOnMainThread(() =>
+                bool saveTriggerInvoked = NativeBackupPlugin.TryInvokeOnMainThread(() =>
                 {
                     nativeSaveTriggered = TryTriggerNativeSaveLikeMenuButton(out saveTriggerRoute);
                 }, timeoutMs: 3000);
 
                 if (!saveTriggerInvoked || !nativeSaveTriggered)
                 {
-                    SimpleBackupPlugin.Log.LogWarning("Failed to trigger native Save-button flow before backup.");
+                    NativeBackupPlugin.Log.LogWarning("Failed to trigger native Save-button flow before backup.");
                     return false;
                 }
 
-                SimpleBackupPlugin.Log.LogDebug($"Triggered native save via {saveTriggerRoute}.");
+                NativeBackupPlugin.Log.LogDebug($"Triggered native save via {saveTriggerRoute}.");
 
                 var timeoutAt = DateTime.UtcNow.AddMilliseconds(SaveSyncTimeoutMs);
                 bool sawSaveStart = false;
@@ -203,7 +203,7 @@ namespace SimpleBackup
                 {
                     float currentStartTime = baselineStartTime;
                     float currentDoneTime = baselineDoneTime;
-                    bool readTimes = SimpleBackupPlugin.TryInvokeOnMainThread(() =>
+                    bool readTimes = NativeBackupPlugin.TryInvokeOnMainThread(() =>
                     {
                         currentStartTime = ZNet.instance.SaveStartTime;
                         currentDoneTime = ZNet.instance.SaveDoneTime;
@@ -211,7 +211,7 @@ namespace SimpleBackup
 
                     if (!readTimes)
                     {
-                        SimpleBackupPlugin.Log.LogWarning("Could not read save completion timestamp from ZNet.");
+                        NativeBackupPlugin.Log.LogWarning("Could not read save completion timestamp from ZNet.");
                         return false;
                     }
 
@@ -225,7 +225,7 @@ namespace SimpleBackup
                         Thread.Sleep(SaveSettleDelayMs);
                         if (!WaitForProbeWrites(probes))
                         {
-                            SimpleBackupPlugin.Log.LogWarning("Save synchronization completed but file writes were not confirmed in time.");
+                            NativeBackupPlugin.Log.LogWarning("Save synchronization completed but file writes were not confirmed in time.");
                             return false;
                         }
                         return true;
@@ -234,12 +234,12 @@ namespace SimpleBackup
                     Thread.Sleep(SavePollIntervalMs);
                 }
 
-                SimpleBackupPlugin.Log.LogWarning($"Timed out waiting for ZNet save completion after {SaveSyncTimeoutMs} ms.");
+                NativeBackupPlugin.Log.LogWarning($"Timed out waiting for ZNet save completion after {SaveSyncTimeoutMs} ms.");
                 return false;
             }
             catch (Exception ex)
             {
-                SimpleBackupPlugin.Log.LogWarning($"Failed while syncing live save state before backup: {ex.Message}");
+                NativeBackupPlugin.Log.LogWarning($"Failed while syncing live save state before backup: {ex.Message}");
                 return false;
             }
         }
@@ -283,7 +283,7 @@ namespace SimpleBackup
                 }
                 catch (Exception ex)
                 {
-                    SimpleBackupPlugin.Log.LogWarning($"Native save method 'OnManualSave' failed: {ex.Message}");
+                    NativeBackupPlugin.Log.LogWarning($"Native save method 'OnManualSave' failed: {ex.Message}");
                 }
             }
 
@@ -362,7 +362,7 @@ namespace SimpleBackup
             }
             catch (Exception ex)
             {
-                SimpleBackupPlugin.Log.LogDebug($"Failed to collect save write probe for {labelPrefix} '{saveName}': {ex.Message}");
+                NativeBackupPlugin.Log.LogDebug($"Failed to collect save write probe for {labelPrefix} '{saveName}': {ex.Message}");
             }
         }
 
@@ -411,33 +411,33 @@ namespace SimpleBackup
                 SaveWithBackups save;
                 if (!SaveSystem.TryGetSaveByName(saveName, saveDataType, out save) || save == null)
                 {
-                    SimpleBackupPlugin.Log.LogWarning($"Native backup skipped because save '{saveName}' was not found for type {saveDataType}.");
+                    NativeBackupPlugin.Log.LogWarning($"Native backup skipped because save '{saveName}' was not found for type {saveDataType}.");
                     return false;
                 }
 
                 SaveFile primary = save.PrimaryFile;
                 if (primary == null)
                 {
-                    SimpleBackupPlugin.Log.LogWarning($"Native backup skipped because no primary file exists for '{saveName}'.");
+                    NativeBackupPlugin.Log.LogWarning($"Native backup skipped because no primary file exists for '{saveName}'.");
                     return false;
                 }
 
                 bool created = InvokeMoveToBackup(primary, DateTime.Now);
                 if (created)
                 {
-                    SimpleBackupPlugin.Log.LogDebug($"Native backup created for {DescribeNativeTarget(saveDataType == SaveDataType.World ? BackupSaveType.World : BackupSaveType.Character, saveName)}");
+                    NativeBackupPlugin.Log.LogDebug($"Native backup created for {DescribeNativeTarget(saveDataType == SaveDataType.World ? BackupSaveType.World : BackupSaveType.Character, saveName)}");
                     PruneNativeBackupsForTarget(primary);
                 }
                 else
                 {
-                    SimpleBackupPlugin.Log.LogWarning($"Native backup call did not create a backup entry for {DescribeNativeTarget(saveDataType == SaveDataType.World ? BackupSaveType.World : BackupSaveType.Character, saveName)}.");
+                    NativeBackupPlugin.Log.LogWarning($"Native backup call did not create a backup entry for {DescribeNativeTarget(saveDataType == SaveDataType.World ? BackupSaveType.World : BackupSaveType.Character, saveName)}.");
                 }
 
                 return created;
             }
             catch (Exception ex)
             {
-                SimpleBackupPlugin.Log.LogError($"Native backup failed for {saveName}: {ex.Message}");
+                NativeBackupPlugin.Log.LogError($"Native backup failed for {saveName}: {ex.Message}");
                 return false;
             }
         }
@@ -456,7 +456,7 @@ namespace SimpleBackup
         {
             try
             {
-                int maxBackupsPerSave = SimpleBackupPlugin.MaxBackupsPerSave != null ? SimpleBackupPlugin.MaxBackupsPerSave.Value : 0;
+                int maxBackupsPerSave = NativeBackupPlugin.MaxBackupsPerSave != null ? NativeBackupPlugin.MaxBackupsPerSave.Value : 0;
                 if (maxBackupsPerSave <= 0 || primaryFile == null)
                 {
                     return;
@@ -506,17 +506,17 @@ namespace SimpleBackup
                     try
                     {
                         backups[index].Delete();
-                        SimpleBackupPlugin.Log.LogDebug($"Pruned native backup: {backups[index].Name}");
+                        NativeBackupPlugin.Log.LogDebug($"Pruned native backup: {backups[index].Name}");
                     }
                     catch (Exception ex)
                     {
-                        SimpleBackupPlugin.Log.LogWarning($"Failed to prune native backup {backups[index].Name}: {ex.Message}");
+                        NativeBackupPlugin.Log.LogWarning($"Failed to prune native backup {backups[index].Name}: {ex.Message}");
                     }
                 }
             }
             catch (Exception ex)
             {
-                SimpleBackupPlugin.Log.LogWarning($"Native backup pruning failed: {ex.Message}");
+                NativeBackupPlugin.Log.LogWarning($"Native backup pruning failed: {ex.Message}");
             }
         }
 
@@ -527,7 +527,7 @@ namespace SimpleBackup
                 var method = typeof(SaveSystem).GetMethod("MoveToBackup", System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic);
                 if (method == null)
                 {
-                    SimpleBackupPlugin.Log.LogWarning("Could not find native SaveSystem.MoveToBackup method.");
+                    NativeBackupPlugin.Log.LogWarning("Could not find native SaveSystem.MoveToBackup method.");
                     return false;
                 }
 
@@ -536,7 +536,7 @@ namespace SimpleBackup
             }
             catch (Exception ex)
             {
-                SimpleBackupPlugin.Log.LogError($"Reflection call to MoveToBackup failed: {ex.Message}");
+                NativeBackupPlugin.Log.LogError($"Reflection call to MoveToBackup failed: {ex.Message}");
                 return false;
             }
         }
@@ -560,7 +560,7 @@ namespace SimpleBackup
             }
             catch (Exception ex)
             {
-                SimpleBackupPlugin.Log.LogWarning($"Failed to resolve canonical character save name: {ex.Message}");
+                NativeBackupPlugin.Log.LogWarning($"Failed to resolve canonical character save name: {ex.Message}");
             }
 
             if (Player.m_localPlayer != null)
@@ -613,7 +613,7 @@ namespace SimpleBackup
             }
             catch (Exception ex)
             {
-                SimpleBackupPlugin.Log.LogWarning($"Failed to read Steam path from registry: {ex.Message}");
+                NativeBackupPlugin.Log.LogWarning($"Failed to read Steam path from registry: {ex.Message}");
             }
 
             return dirs;
@@ -770,3 +770,5 @@ namespace SimpleBackup
         }
     }
 }
+
+
