@@ -6,7 +6,7 @@
 <p><b>A simple backup valheim mod</b></p>
 
 **Native Major Version:** Valheim 0.217+  
-**Source Code:** [GitHub Repository](https://github.com/AlonResearch/Simple-Backup-Valheim-Mod)  
+**Source Code:** [GitHub Repository](https://github.com/AlonResearch/NativeBackup-Valheim-Mod)  
 **Donation Link:** [PayPal / Ko-fi Placeholder]  
 **Discord Server:** [Discord Placeholder]  
 

@@ -1,7 +1,7 @@
 {
     "name": "NativeBackup",
     "version_number": "0.1.1",
-    "website_url": "https://github.com/AlonResearch/Simple-Backup-Valheim-Mod",
+    "website_url": "https://github.com/AlonResearch/NativeBackup-Valheim-Mod",
     "description": "A simple backup valheim mod",
     "dependencies": [
         "denikson-BepInExPack_Valheim-5.4.1901"
