@@ -3,11 +3,14 @@ using BepInEx.Configuration;
 using BepInEx.Logging;
 using HarmonyLib;
 using UnityEngine;
+using UnityEngine.Networking;
 using System.Reflection;
 using System.Collections.Concurrent;
 using System;
 using System.Threading;
 using System.Collections.Generic;
+using System.Collections;
+using System.IO;
 
 namespace NativeBackup
 {
@@ -23,8 +26,35 @@ namespace NativeBackup
         private static readonly ConcurrentQueue<string> _uiMessageQueue = new ConcurrentQueue<string>();
         private static readonly ConcurrentQueue<Action> _mainThreadActions = new ConcurrentQueue<Action>();
         private static int _backupIndicatorActive;
-        private static long _backupIndicatorStartTicks;
-        private static GUIStyle _backupIndicatorStyle;
+        private static Texture2D _backupIndicatorTexture;
+        private static bool _iconLoadInProgress;
+        private static bool _iconLoadCompleted;
+        private static int _nativeFallbackActive;
+        private static readonly string[] _indicatorMethodNames =
+        {
+            "ShowSavingIcon",
+            "SetSavingIcon",
+            "SetSavingIndicator",
+            "SetSaving"
+        };
+        private static readonly string[] _indicatorEnableMethodNames =
+        {
+            "ShowSavingIcon",
+            "ShowSaving",
+            "StartSavingIcon"
+        };
+        private static readonly string[] _indicatorDisableMethodNames =
+        {
+            "HideSavingIcon",
+            "HideSaving",
+            "StopSavingIcon"
+        };
+        private static readonly string[] _indicatorFieldNames =
+        {
+            "m_showSavingIcon",
+            "m_showSaving",
+            "m_saving"
+        };
 
         public static void QueueUIMessage(string msg)
         {
@@ -33,14 +63,37 @@ namespace NativeBackup
 
         public static void SetBackupIndicatorActive(bool active)
         {
-            if (active)
-            {
-                Interlocked.Exchange(ref _backupIndicatorActive, 1);
-                Interlocked.Exchange(ref _backupIndicatorStartTicks, DateTime.UtcNow.Ticks);
-                return;
-            }
+            Interlocked.Exchange(ref _backupIndicatorActive, active ? 1 : 0);
 
-            Interlocked.Exchange(ref _backupIndicatorActive, 0);
+            // Native UI hooks must run on the main Unity thread.
+            _mainThreadActions.Enqueue(() =>
+            {
+                try
+                {
+                    if (active)
+                    {
+                        bool hasCustomIcon = TryEnsureBackupIndicatorIconLoaded();
+                        if (!hasCustomIcon && _iconLoadCompleted && Volatile.Read(ref _nativeFallbackActive) == 0)
+                        {
+                            if (TrySetNativeSavingIndicator(true))
+                            {
+                                Interlocked.Exchange(ref _nativeFallbackActive, 1);
+                            }
+                        }
+                        return;
+                    }
+
+                    if (Volatile.Read(ref _nativeFallbackActive) == 1 && !IsNativeSaveStillRunning())
+                    {
+                        TrySetNativeSavingIndicator(false);
+                        Interlocked.Exchange(ref _nativeFallbackActive, 0);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Log?.LogDebug($"Failed to toggle native saving indicator: {ex.Message}");
+                }
+            });
         }
 
         public static bool TryInvokeOnMainThread(Action action, int timeoutMs = 3000)
@@ -101,6 +154,8 @@ namespace NativeBackup
 
             _harmony = new Harmony(PluginGUID);
             _harmony.PatchAll(Assembly.GetExecutingAssembly());
+
+            StartIconLoadIfNeeded();
 
             Logger.LogInfo($"{PluginName} v{PluginVersion} loaded!");
         }
@@ -178,6 +233,11 @@ namespace NativeBackup
         private void OnDestroy()
         {
             _harmony?.UnpatchSelf();
+            if (_backupIndicatorTexture != null)
+            {
+                Destroy(_backupIndicatorTexture);
+                _backupIndicatorTexture = null;
+            }
         }
 
         private void OnGUI()
@@ -187,25 +247,163 @@ namespace NativeBackup
                 return;
             }
 
-            if (_backupIndicatorStyle == null)
+            if (!TryEnsureBackupIndicatorIconLoaded())
             {
-                _backupIndicatorStyle = new GUIStyle(GUI.skin.label)
+                if (_iconLoadCompleted && Volatile.Read(ref _nativeFallbackActive) == 0)
                 {
-                    alignment = TextAnchor.MiddleCenter,
-                    fontSize = 22,
-                    fontStyle = FontStyle.Bold,
-                    richText = true
-                };
+                    if (TrySetNativeSavingIndicator(true))
+                    {
+                        Interlocked.Exchange(ref _nativeFallbackActive, 1);
+                    }
+                }
+                return;
             }
 
             float pulse = 0.35f + (0.65f * Mathf.Abs(Mathf.Sin(Time.unscaledTime * 5f)));
             Color previous = GUI.color;
             GUI.color = new Color(1f, 1f, 1f, pulse);
 
-            var badgeRect = new Rect(Screen.width - 74f, 18f, 56f, 38f);
-            GUI.Label(badgeRect, "🛡💾", _backupIndicatorStyle);
+            var iconRect = new Rect(18f, 18f, 40f, 40f);
+            GUI.DrawTexture(iconRect, _backupIndicatorTexture, ScaleMode.ScaleToFit, true);
 
             GUI.color = previous;
+        }
+
+        private static bool TryEnsureBackupIndicatorIconLoaded()
+        {
+            if (_backupIndicatorTexture != null)
+            {
+                return true;
+            }
+
+            StartIconLoadIfNeeded();
+            return false;
+        }
+
+        private static void StartIconLoadIfNeeded()
+        {
+            if (Instance == null || _backupIndicatorTexture != null || _iconLoadCompleted || _iconLoadInProgress)
+            {
+                return;
+            }
+
+            Instance.StartCoroutine(Instance.LoadBackupIndicatorIconCoroutine());
+        }
+
+        private IEnumerator LoadBackupIndicatorIconCoroutine()
+        {
+            _iconLoadInProgress = true;
+
+            foreach (string path in GetIconCandidatePaths())
+            {
+                if (string.IsNullOrEmpty(path) || !File.Exists(path))
+                {
+                    continue;
+                }
+
+                string absolutePath = Path.GetFullPath(path).Replace("\\", "/");
+                using (UnityWebRequest request = UnityWebRequestTexture.GetTexture("file:///" + absolutePath, false))
+                {
+                    yield return request.SendWebRequest();
+
+                    if (request.result == UnityWebRequest.Result.Success)
+                    {
+                        Texture2D texture = DownloadHandlerTexture.GetContent(request);
+                        if (texture != null)
+                        {
+                            texture.wrapMode = TextureWrapMode.Clamp;
+                            texture.filterMode = FilterMode.Bilinear;
+                            _backupIndicatorTexture = texture;
+                            _iconLoadInProgress = false;
+                            _iconLoadCompleted = true;
+                            Log?.LogDebug($"Loaded backup indicator icon from '{path}'.");
+                            yield break;
+                        }
+                    }
+                }
+            }
+
+            _iconLoadInProgress = false;
+            _iconLoadCompleted = true;
+            Log?.LogDebug("Backup indicator icon load failed; native indicator fallback will be used.");
+        }
+
+        private static IEnumerable<string> GetIconCandidatePaths()
+        {
+            string assemblyDir = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
+
+            if (!string.IsNullOrEmpty(assemblyDir))
+            {
+                yield return Path.Combine(assemblyDir, "icon.png");
+                yield return Path.Combine(assemblyDir, "NativeBackup", "icon.png");
+            }
+
+            yield return Path.Combine(Paths.PluginPath, "icon.png");
+            yield return Path.Combine(Paths.PluginPath, "NativeBackup", "icon.png");
+            yield return Path.Combine(Paths.BepInExRootPath, "icon.png");
+            yield return Path.Combine(Environment.CurrentDirectory, "icon.png");
+        }
+
+        private static bool IsNativeSaveStillRunning()
+        {
+            if (ZNet.instance == null)
+            {
+                return false;
+            }
+
+            return ZNet.instance.SaveStartTime > ZNet.instance.SaveDoneTime;
+        }
+
+        private static bool TrySetNativeSavingIndicator(bool active)
+        {
+            object[] targets =
+            {
+                MessageHud.instance,
+                Hud.instance
+            };
+
+            foreach (object target in targets)
+            {
+                if (target == null)
+                {
+                    continue;
+                }
+
+                Type targetType = target.GetType();
+
+                foreach (string methodName in _indicatorMethodNames)
+                {
+                    MethodInfo boolMethod = AccessTools.Method(targetType, methodName, new[] { typeof(bool) });
+                    if (boolMethod != null)
+                    {
+                        boolMethod.Invoke(target, new object[] { active });
+                        return true;
+                    }
+                }
+
+                string[] noArgMethods = active ? _indicatorEnableMethodNames : _indicatorDisableMethodNames;
+                foreach (string methodName in noArgMethods)
+                {
+                    MethodInfo method = AccessTools.Method(targetType, methodName, Type.EmptyTypes);
+                    if (method != null)
+                    {
+                        method.Invoke(target, null);
+                        return true;
+                    }
+                }
+
+                foreach (string fieldName in _indicatorFieldNames)
+                {
+                    FieldInfo field = AccessTools.Field(targetType, fieldName);
+                    if (field != null && field.FieldType == typeof(bool))
+                    {
+                        field.SetValue(target, active);
+                        return true;
+                    }
+                }
+            }
+
+            return false;
         }
     }
 }

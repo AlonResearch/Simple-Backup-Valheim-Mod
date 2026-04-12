@@ -59,6 +59,12 @@
     <Reference Include="UnityEngine.IMGUIModule">
       <HintPath>$(ValheimInstallPath)\valheim_Data\Managed\UnityEngine.IMGUIModule.dll</HintPath>
     </Reference>
+    <Reference Include="UnityEngine.UnityWebRequestModule">
+      <HintPath>$(ValheimInstallPath)\valheim_Data\Managed\UnityEngine.UnityWebRequestModule.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine.UnityWebRequestTextureModule">
+      <HintPath>$(ValheimInstallPath)\valheim_Data\Managed\UnityEngine.UnityWebRequestTextureModule.dll</HintPath>
+    </Reference>
     <Reference Include="Unity.TextMeshPro">
       <HintPath>$(ValheimInstallPath)\valheim_Data\Managed\Unity.TextMeshPro.dll</HintPath>
     </Reference>
